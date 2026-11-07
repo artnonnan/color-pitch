@@ -15,11 +15,31 @@ export type MicErrorCode =
   | "unsupported" // browser has no getUserMedia
   | "not-found" // no microphone
   | "in-use" // another app is using it
+  | "audio-session" // iOS audio session still can't record
   | "failed"; // anything else
 export interface MicError {
   code: MicErrorCode;
   detail: string; // raw error name/message, shown small for troubleshooting
 }
+
+/**
+ * iOS Safari 17+: the page's audio session category. lib/audio.ts sets "playback"
+ * so sound plays with the silent switch on, but "playback" forbids capture —
+ * getUserMedia then fails with InvalidStateError ("AudioSession category is not
+ * compatible with audio capture"). So: "play-and-record" while the mic is open,
+ * back to "playback" after.
+ */
+type AudioSessionType = "auto" | "playback" | "play-and-record";
+function setAudioSession(type: AudioSessionType) {
+  try {
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session && session.type !== type) session.type = type;
+  } catch {
+    /* not supported */
+  }
+}
+const hasAudioSession = () =>
+  typeof navigator !== "undefined" && "audioSession" in (navigator as Navigator & { audioSession?: unknown });
 
 export function isInAppBrowser(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -32,6 +52,7 @@ async function classify(e: unknown): Promise<MicError> {
   const detail = [name, message].filter(Boolean).join(": ");
   if (name === "NotFoundError" || name === "DevicesNotFoundError" || name === "OverconstrainedError")
     return { code: "not-found", detail };
+  if (name === "InvalidStateError") return { code: "audio-session", detail };
   if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError")
     return { code: "in-use", detail };
   if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
@@ -72,20 +93,29 @@ export async function startMic(): Promise<MicSession> {
     window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const ctx = new Ctx();
   void ctx.resume();
+  // Must be set before getUserMedia (see setAudioSession).
+  setAudioSession("play-and-record");
+  const constraints: MediaStreamConstraints = {
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  };
   let stream: MediaStream;
   try {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      });
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch (e) {
-      // Some devices reject the processing constraints; retry with plain audio.
       const name = (e as DOMException)?.name;
-      if (name !== "OverconstrainedError" && name !== "TypeError") throw e;
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (name === "InvalidStateError" && hasAudioSession()) {
+        // Category still incompatible — let iOS pick one itself, then retry.
+        setAudioSession("auto");
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } else if (name === "OverconstrainedError" || name === "TypeError") {
+        // Some devices reject the processing constraints; retry with plain audio.
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } else throw e;
     }
   } catch (e) {
     void ctx.close();
+    setAudioSession("playback");
     throw await classify(e);
   }
   const source = ctx.createMediaStreamSource(stream);
@@ -109,6 +139,7 @@ export async function startMic(): Promise<MicSession> {
     },
     stop() {
       stream.getTracks().forEach((t) => t.stop());
+      setAudioSession("playback"); // back to silent-switch-proof playback
       try {
         source.disconnect();
       } catch {
