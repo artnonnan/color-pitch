@@ -1,0 +1,27 @@
+{
+  "name": "color-pitch",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "next": "16.4.5",
+    "pitchy": "4.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tone": "15.1.22"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.2.4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "4.2.4",
+    "typescript": "5.9.3"
+  }
+}
