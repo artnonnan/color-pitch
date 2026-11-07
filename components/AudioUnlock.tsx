@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getAudioStatus, isAudioUnlocked, onAudioStatus, preloadAudio, unlockAudio, type AudioStatus } from "@/lib/audio";
+import { getAudioStatus, isAudioRunning, onAudioStatus, preloadAudio, unlockAudio, type AudioStatus } from "@/lib/audio";
 import { t } from "@/i18n";
 
 /**
- * Unlocks Web Audio on the first tap anywhere (iOS needs a real gesture —
- * touchend/click, not just touchstart) and shows a small status pill.
+ * Unlocks Web Audio on a tap (iOS needs a real gesture — touchend/click, not just
+ * touchstart). The listeners stay on for the whole session: iOS suspends audio
+ * when the screen locks or the user switches apps, and the next tap must wake it.
  */
 export function AudioUnlock() {
   const [status, setStatus] = useState<AudioStatus>(getAudioStatus());
@@ -14,15 +15,13 @@ export function AudioUnlock() {
     void preloadAudio();
     const off = onAudioStatus(setStatus);
     const handler = () => {
-      unlockAudio();
-      if (isAudioUnlocked()) remove();
+      if (!isAudioRunning()) unlockAudio();
     };
     const events = ["touchend", "click", "keydown"] as const;
-    const remove = () => events.forEach((e) => document.removeEventListener(e, handler, true));
     events.forEach((e) => document.addEventListener(e, handler, true));
     return () => {
       off();
-      remove();
+      events.forEach((e) => document.removeEventListener(e, handler, true));
     };
   }, []);
 

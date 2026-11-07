@@ -82,30 +82,62 @@ export function unlockAudio() {
   } catch {
     /* ignore */
   }
-  if (!unlocked) {
-    try {
-      const a = new Audio(silentWav());
-      a.setAttribute("playsinline", "");
-      void a.play().catch(() => {});
-    } catch {
-      /* ignore */
-    }
+  if (isAudioRunning()) return;
+  // Re-played on every unlock, not just the first: after the screen locks or the
+  // app goes to the background, iOS needs it again to get the media channel back.
+  try {
+    const a = new Audio(silentWav());
+    a.setAttribute("playsinline", "");
+    void a.play().catch(() => {});
+  } catch {
+    /* ignore */
   }
   if (Tone) {
+    watchContext();
     // Tone.start() calls context.resume() synchronously — that's what iOS needs.
-    void Tone.start().then(() => {
-      if (!unlocked) {
-        unlocked = true;
-        ensureInstrument();
-      }
-    });
-    if (Tone.getContext().state === "running") {
-      unlocked = true;
-      ensureInstrument();
-    }
+    void Tone.start().then(onRunning, () => {});
+    if (isAudioRunning()) onRunning();
   } else {
     void preloadAudio().then(() => unlockAudio());
   }
+}
+
+/** True only while the AudioContext is actually producing sound. */
+export function isAudioRunning(): boolean {
+  return !!Tone && Tone.getContext().state === "running";
+}
+
+function onRunning() {
+  if (!isAudioRunning()) return;
+  unlocked = true;
+  void ensureInstrument().then(() => {
+    if (isAudioRunning()) setStatus(instrument === "piano" && !piano?.loaded ? "error" : "ready");
+  });
+}
+
+// iOS suspends ("suspended") or interrupts ("interrupted", Safari-only) the context
+// when the screen locks, another app plays audio, or a call comes in. It does not
+// resume on its own, so show the "tap to enable sound" pill again until a tap.
+let watching = false;
+function watchContext() {
+  if (watching || !Tone) return;
+  watching = true;
+  const raw = Tone.getContext().rawContext as unknown as BaseAudioContext;
+  raw.addEventListener("statechange", () => {
+    if (isAudioRunning()) onRunning();
+    else if (unlocked) setStatus("locked");
+  });
+  const tryResume = () => {
+    if (document.visibilityState !== "visible" || isAudioRunning() || !unlocked) return;
+    // Works without a gesture on some browsers; on iOS the next tap does it.
+    void Tone?.start().then(onRunning, () => {});
+    window.setTimeout(() => {
+      if (!isAudioRunning() && unlocked) setStatus("locked");
+    }, 300);
+  };
+  document.addEventListener("visibilitychange", tryResume);
+  window.addEventListener("pageshow", tryResume);
+  window.addEventListener("focus", tryResume);
 }
 
 function ensureInstrument(): Promise<void> {
@@ -162,13 +194,20 @@ if (typeof window !== "undefined") {
     instrument,
     playCount,
   });
+  // Test hook: suspend the context the way iOS does on screen lock / app switch.
+  (window as unknown as { __cpAudioSuspend?: () => Promise<void> }).__cpAudioSuspend = async () => {
+    if (Tone) await (Tone.getContext().rawContext as unknown as AudioContext).suspend();
+  };
 }
 
 async function trigger(midis: number[], dur: number, at = 0, velocity = 0.8) {
+  // Before any await, so a tap that plays a note (replay, start…) also resumes a
+  // context iOS suspended while the app was in the background.
+  if (!isAudioRunning()) unlockAudio();
   const T = Tone ?? (await preloadAudio());
-  if (!unlocked) {
-    // Not unlocked yet (shouldn't happen when called from a tap) — try anyway.
-    unlockAudio();
+  if (!isAudioRunning()) {
+    // iOS may leave resume() pending until a gesture, so never wait more than 400 ms.
+    await Promise.race([T.getContext().resume().catch(() => {}), wait(400)]);
   }
   await ensureInstrument();
   const when = T.now() + 0.05 + at;
