@@ -5,6 +5,7 @@ import { colorOf, inkOn } from "@/lib/colors";
 import { centsFromPc, freqToMidiFloat, nameOf, pcDiff, pcOf, randInt, type PC } from "@/lib/music";
 import { playNote, stopAll, wait } from "@/lib/audio";
 import { capturePitch, startMic, type MicError, type MicSession } from "@/lib/pitch";
+import { MicErrorBox, toMicError } from "../MicErrorBox";
 import { dayKey, firstNoteTarget, markStepDone, type FirstNoteEntry } from "@/lib/state";
 import { Button, Card, ColorWash, ScreenHeader, cx } from "../ui";
 import { t } from "@/i18n";
@@ -28,6 +29,7 @@ export function FirstNote({ onDone, onBack, sessionLabel }: { onDone: () => void
   const [level, setLevel] = useState(0);
   const [progressPct, setProgressPct] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [micErr, setMicErr] = useState<MicError | null>(null);
   const [slider, setSlider] = useState(() => randInt(SLIDER_LO, SLIDER_HI));
   const [realMidi, setRealMidi] = useState<number | null>(null);
   const [wash, setWash] = useState(0);
@@ -56,6 +58,7 @@ export function FirstNote({ onDone, onBack, sessionLabel }: { onDone: () => void
 
   const hum = async () => {
     setError(null);
+    setMicErr(null);
     try {
       const m = await startMic(); // called straight from the tap
       mic.current = m;
@@ -76,8 +79,7 @@ export function FirstNote({ onDone, onBack, sessionLabel }: { onDone: () => void
       save({ target, cents, method: "mic", freq }, freqToMidiFloat(freq));
     } catch (e) {
       mic.current = null;
-      const code = e as MicError;
-      setError(code === "denied" ? t.mic.denied : code === "unsupported" ? t.mic.unsupported : t.mic.denied);
+      setMicErr(toMicError(e));
       setPhase("slider");
     }
   };
@@ -148,7 +150,7 @@ export function FirstNote({ onDone, onBack, sessionLabel }: { onDone: () => void
 
         {phase === "slider" && (
           <div className="w-full space-y-4">
-            {error && <p className="rounded-2xl bg-bad/10 px-4 py-2 text-sm text-bad">{error}</p>}
+            {micErr && <MicErrorBox error={micErr} onRetry={hum} />}
             <p className="text-ink-2">{t.first.sliderHelp}</p>
             <input
               type="range"

@@ -2,7 +2,46 @@
 // Microphone pitch detection with pitchy (McLeod pitch method) + Web Audio.
 import { PitchDetector } from "pitchy";
 
-export type MicError = "denied" | "unsupported" | "failed";
+/**
+ * Why the microphone could not start. Each one gets its own message, because
+ * "permission denied" is only one of many causes (no mic, mic busy, OS privacy
+ * setting, in-app browser, non-https page…).
+ */
+export type MicErrorCode =
+  | "denied" // the user (or the site setting) blocked it
+  | "system-denied" // the OS blocks the browser from the mic
+  | "in-app" // LINE / Facebook / Instagram in-app browser
+  | "insecure" // not https
+  | "unsupported" // browser has no getUserMedia
+  | "not-found" // no microphone
+  | "in-use" // another app is using it
+  | "failed"; // anything else
+export interface MicError {
+  code: MicErrorCode;
+  detail: string; // raw error name/message, shown small for troubleshooting
+}
+
+export function isInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Line\/|FBAN|FBAV|FB_IAB|Instagram|Messenger|TikTok|Twitter|MicroMessenger/i.test(navigator.userAgent);
+}
+
+async function classify(e: unknown): Promise<MicError> {
+  const name = (e as DOMException)?.name ?? "";
+  const message = (e as Error)?.message ?? String(e);
+  const detail = [name, message].filter(Boolean).join(": ");
+  if (name === "NotFoundError" || name === "DevicesNotFoundError" || name === "OverconstrainedError")
+    return { code: "not-found", detail };
+  if (name === "NotReadableError" || name === "TrackStartError" || name === "AbortError")
+    return { code: "in-use", detail };
+  if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
+    if (isInAppBrowser()) return { code: "in-app", detail };
+    // Chrome: "Permission denied by system" = the OS privacy setting blocks the browser.
+    if (/system/i.test(message)) return { code: "system-denied", detail };
+    return { code: "denied", detail };
+  }
+  return { code: isInAppBrowser() ? "in-app" : "failed", detail };
+}
 
 export interface PitchFrame {
   freq: number | null; // null when no clear pitch
@@ -23,8 +62,11 @@ const MAX_FREQ = 2000;
  * resumed before the first await, which iOS requires).
  */
 export async function startMic(): Promise<MicSession> {
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    throw { code: "insecure", detail: location.protocol } as MicError;
+  }
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-    throw "unsupported" as MicError;
+    throw { code: isInAppBrowser() ? "in-app" : "unsupported", detail: "no mediaDevices.getUserMedia" } as MicError;
   }
   const Ctx: typeof AudioContext =
     window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -32,13 +74,19 @@ export async function startMic(): Promise<MicSession> {
   void ctx.resume();
   let stream: MediaStream;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    });
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+    } catch (e) {
+      // Some devices reject the processing constraints; retry with plain audio.
+      const name = (e as DOMException)?.name;
+      if (name !== "OverconstrainedError" && name !== "TypeError") throw e;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
   } catch (e) {
     void ctx.close();
-    const name = (e as DOMException)?.name;
-    throw (name === "NotAllowedError" || name === "SecurityError" ? "denied" : "failed") as MicError;
+    throw await classify(e);
   }
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();

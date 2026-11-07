@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { colorOf, inkOn } from "@/lib/colors";
 import { freqToMidiFloat, midiName, nameOf, pcDiff, pcOf, type PC } from "@/lib/music";
 import { capturePitch, startMic, type MicError, type MicSession } from "@/lib/pitch";
+import { MicErrorBox, toMicError } from "../MicErrorBox";
 import { Keyboard } from "../Keyboard";
 import { Button, Card, ColorWash, NoteDot, ScreenHeader, cx } from "../ui";
 import { t } from "@/i18n";
@@ -18,6 +19,7 @@ export function Tuner({ onBack }: { onBack?: () => void }) {
   const [level, setLevel] = useState(0);
   const [result, setResult] = useState<{ midi: number; cents: number; guess: PC } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [micErr, setMicErr] = useState<MicError | null>(null);
   const [wash, setWash] = useState(0);
   const mic = useRef<MicSession | null>(null);
 
@@ -26,6 +28,7 @@ export function Tuner({ onBack }: { onBack?: () => void }) {
   const detect = async () => {
     if (guess === null || listening) return;
     setError(null);
+    setMicErr(null);
     setResult(null);
     try {
       const m = await startMic();
@@ -53,7 +56,7 @@ export function Tuner({ onBack }: { onBack?: () => void }) {
     } catch (e) {
       mic.current = null;
       setListening(false);
-      setError((e as MicError) === "unsupported" ? t.mic.unsupported : t.mic.denied);
+      setMicErr(toMicError(e));
     }
   };
 
@@ -92,6 +95,7 @@ export function Tuner({ onBack }: { onBack?: () => void }) {
         🎤 {listening ? t.tuner.listening : t.tuner.detectTap}
       </Button>
       {error && <p className="rounded-2xl bg-bad/10 px-4 py-2 text-sm text-bad">{error}</p>}
+      {micErr && <MicErrorBox error={micErr} onRetry={guess !== null ? detect : undefined} />}
 
       {result && actualColor && (
         <Card className="pop relative z-[11] flex items-center gap-4">
