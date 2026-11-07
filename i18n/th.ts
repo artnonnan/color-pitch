@@ -57,6 +57,52 @@ export const th = {
     chords: { title: "สีและอารมณ์ของคอร์ด", desc: "ฟังคอร์ด แล้วเลือกชนิดของคอร์ด", time: "~3 นาที" },
     modes: { title: "ความสว่างของโหมด", desc: "วางสเกลบนแถบสว่าง–มืด", time: "~3 นาที" },
     tuner: { title: "จูนเนอร์พกพา", desc: "ได้ยินเสียงอะไรในชีวิตประจำวัน ลองทายแล้ววัดดู", time: "ทุกเวลา" },
+    rush: { title: "Color Rush", desc: "60 วินาที ตอบให้ไวที่สุด ทำคอมโบให้ยาว", time: "1 นาที" },
+    sing: { title: "ร้องตามสี", desc: "เห็นแค่สี ไม่บอกชื่อ ร้องเสียงของสีนั้นออกมา", time: "~2 นาที" },
+    roots: { title: "รากของคอร์ด", desc: "ฟังคอร์ด แล้วแตะสีของโน้ตราก", time: "~2 นาที" },
+  },
+
+  fx: {
+    tapToContinue: "แตะเพื่อไปต่อ",
+    combo: (n: number) => `${n} คอมโบ`,
+    newNote: "ปลดล็อกโน้ตใหม่",
+    newChord: "ปลดล็อกคอร์ดใหม่",
+    newBest: "สถิติใหม่!",
+    newNoteSub: (n: string) => `จดจำสีนี้ไว้ นี่คือเสียง ${n}`,
+  },
+
+  rush: {
+    best: (n: number) => `สถิติสูงสุด ${n} แต้ม`,
+    noBest: "ยังไม่มีสถิติ",
+    rules: "โน้ตจะมาเรื่อยๆ ตอบถูกได้แต้ม ตอบถูกติดกันทุก 5 ข้อแต้มคูณเพิ่ม (สูงสุด x5) ตอบเร็วได้โบนัส ตอบผิดคอมโบหาย",
+    score: "แต้ม",
+    timeUp: "หมดเวลา!",
+    result: (score: number, c: number, n: number) => `${score} แต้ม · ถูก ${c}/${n}`,
+    maxCombo: (n: number) => `คอมโบสูงสุด ${n}`,
+    again: "เล่นอีกรอบ",
+  },
+
+  sing: {
+    prompt: "ร้องหรือฮัมเสียงของสีนี้",
+    hint: "ไม่มีเสียงอ้างอิง นึกถึงสีแล้วปล่อยเสียงออกมา",
+    sing: "ร้องเลย",
+    listening: "กำลังฟัง…",
+    perfect: "เป๊ะมาก!",
+    close: "ใกล้แล้ว!",
+    off: "ยังไม่ใช่",
+    itWas: (n: string) => `สีนี้คือ ${n}`,
+    youSang: (n: string, c: number) => `คุณร้อง ${n} (${c > 0 ? "+" : ""}${Math.round(c)}¢ จากเป้า)`,
+    tapInstead: "ใช้ไมค์ไม่ได้: แตะคีย์ที่คิดว่าใช่แทน (คีย์ไม่มีสี)",
+    round: (i: number, n: number) => `ข้อ ${i}/${n}`,
+    summary: (c: number, n: number) => `ร้องตรงสี ${c} จาก ${n} ข้อ`,
+  },
+
+  roots: {
+    listen: "ฟังคอร์ด แล้วแตะโน้ตราก (root)",
+    correct: (n: string, q: string) => `ใช่! ${n}${q}`,
+    wrong: (n: string, q: string) => `รากคือ ${n} (คอร์ด ${n}${q})`,
+    playingRoot: "เล่นโน้ตรากให้ฟัง แล้วตามด้วยคอร์ด",
+    round: (i: number, n: number) => `ข้อ ${i}/${n}`,
   },
 
   session: {
@@ -220,6 +266,10 @@ export const th = {
     totalMinutes: "นาทีที่ฝึก",
     streak: "วันต่อเนื่อง",
     chordAccuracy: "ความแม่นยำของคอร์ด",
+    games: "แบบฝึกเพิ่มเติม",
+    rushBest: "Color Rush สูงสุด",
+    singAcc: "ร้องตามสี",
+    rootAcc: "รากของคอร์ด",
     tunerAccuracy: "จูนเนอร์ในชีวิตประจำวัน",
     table: "ดูเป็นตาราง",
     date: "วันที่",

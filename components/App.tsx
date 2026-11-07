@@ -11,11 +11,22 @@ import { Quiz } from "./exercises/Quiz";
 import { Chords } from "./exercises/Chords";
 import { Modes } from "./exercises/Modes";
 import { Tuner } from "./exercises/Tuner";
+import { Rush } from "./exercises/Rush";
+import { Sing } from "./exercises/Sing";
+import { Roots } from "./exercises/Roots";
+import { BurstLayer, clearBursts, fireworks } from "./fx/Burst";
+import { Aurora } from "./fx/Aurora";
+import { colorOf } from "@/lib/colors";
+import { unlockedNotes } from "@/lib/state";
 import { Button, Card, cx } from "./ui";
 import { t } from "@/i18n";
 
-export type Screen = "home" | "first" | "quiz" | "chords" | "modes" | "tuner" | "stats" | "settings" | "session";
-const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session"];
+export type Screen =
+  | "home" | "first" | "quiz" | "chords" | "modes" | "tuner" | "stats" | "settings" | "session"
+  | "rush" | "sing" | "roots";
+const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots"];
+// Screens that play notes: the daily first note should come before any of them.
+const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots"];
 const NAV: { s: Screen; icon: string; label: string }[] = [
   { s: "home", icon: "🏠", label: t.nav.home },
   { s: "tuner", icon: "📻", label: t.nav.tuner },
@@ -44,7 +55,10 @@ function Shell() {
 
   useEffect(() => {
     setScreen(readHash());
-    const onHash = () => setScreen(readHash());
+    const onHash = () => {
+      clearBursts();
+      setScreen(readHash());
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -56,6 +70,7 @@ function Shell() {
   }, []);
 
   const go = useCallback((s: Screen) => {
+    clearBursts();
     if (s === "home") {
       // Replace so the back button doesn't bounce between exercises.
       history.replaceState(null, "", window.location.pathname);
@@ -74,7 +89,7 @@ function Shell() {
   // The daily first note should come before hearing any other note today.
   const today = dayKey();
   const firstDoneToday = !!state.progress.firstNote[today];
-  const needsGate = (screen === "quiz" || screen === "chords" || screen === "modes") && !firstDoneToday && !gateSkipped;
+  const needsGate = GATED.includes(screen) && !firstDoneToday && !gateSkipped;
   const showNav = ["home", "tuner", "stats", "settings"].includes(screen);
 
   let body: React.ReactNode;
@@ -95,6 +110,12 @@ function Shell() {
     body = <Chords onDone={home} onBack={home} />;
   } else if (screen === "modes") {
     body = <Modes onBack={home} />;
+  } else if (screen === "rush") {
+    body = <Rush onBack={home} />;
+  } else if (screen === "sing") {
+    body = <Sing onBack={home} />;
+  } else if (screen === "roots") {
+    body = <Roots onBack={home} />;
   } else if (screen === "tuner") {
     body = <Tuner />;
   } else if (screen === "stats") {
@@ -106,7 +127,10 @@ function Shell() {
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-md px-4 pt-2">
+    <>
+    <Aurora colors={unlockedNotes(state.progress).map((pc) => colorOf(state.settings.noteColors, pc))} />
+    <BurstLayer />
+    <main className="relative z-[1] mx-auto min-h-dvh w-full max-w-md px-4 pt-2">
       {!storageOk && (
         <div className="mb-2 rounded-2xl bg-bad/15 px-4 py-2 text-sm text-bad">{t.settings.storageWarn}</div>
       )}
@@ -132,6 +156,7 @@ function Shell() {
         </nav>
       )}
     </main>
+    </>
   );
 }
 
@@ -169,20 +194,33 @@ function SessionRunner({ onExit }: { onExit: () => void }) {
   };
 
   if (i >= queue.length) {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 text-center">
-        <div className="pop text-7xl">🌈</div>
-        <h1 className="text-2xl font-black">{t.session.allDone}</h1>
-        <p className="text-ink-2">{t.session.allDoneBody}</p>
-        <Button big onClick={onExit}>
-          {t.session.backHome}
-        </Button>
-      </div>
-    );
+    return <SessionDone onExit={onExit} />;
   }
   const label = t.session.stepOf(i + 1, queue.length);
   const step = queue[i];
   if (step === "first") return <FirstNote key="first" onDone={next} onBack={onExit} sessionLabel={label} />;
   if (step === "quiz") return <Quiz key="quiz" onDone={next} onBack={onExit} sessionLabel={label} />;
   return <Chords key="chords" onDone={next} onBack={onExit} sessionLabel={label} />;
+}
+
+/** End of the daily session: fireworks in every unlocked color. */
+function SessionDone({ onExit }: { onExit: () => void }) {
+  const { state } = useStore();
+  useEffect(() => {
+    const cs = unlockedNotes(state.progress).map((pc) => colorOf(state.settings.noteColors, pc));
+    const id = window.setTimeout(() => fireworks(cs, 10), 250);
+    return () => window.clearTimeout(id);
+    // once, on arrival
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 text-center">
+      <div className="glow-pulse text-8xl">🌈</div>
+      <h1 className="text-3xl font-black">{t.session.allDone}</h1>
+      <p className="text-ink-2">{t.session.allDoneBody}</p>
+      <Button big onClick={onExit}>
+        {t.session.backHome}
+      </Button>
+    </div>
+  );
 }

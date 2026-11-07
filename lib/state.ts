@@ -6,6 +6,9 @@ import {
   INITIAL_CHORDS,
   INITIAL_NOTES,
   NOTE_UNLOCK_ORDER,
+  midisOfPc,
+  pickWeighted,
+  randInt,
   type ChordQuality,
   type Mode,
   type PC,
@@ -61,6 +64,26 @@ export interface TunerEntry {
   cents: number;
   freq: number;
 }
+export interface SingEntry {
+  t: number;
+  target: PC;
+  /** Signed cents from the target pitch class (±600); null when answered by tapping. */
+  cents: number | null;
+  answer: PC;
+}
+export interface RootAnswer {
+  t: number;
+  target: PC;
+  answer: PC;
+  quality: ChordQuality;
+}
+export interface RushRun {
+  t: number;
+  score: number;
+  correct: number;
+  total: number;
+  maxCombo: number;
+}
 export type SessionStep = "first" | "quiz" | "chords";
 
 export interface Progress {
@@ -76,6 +99,9 @@ export interface Progress {
   tuner: TunerEntry[];
   practiceSeconds: Record<string, number>; // by date
   sessionDone: Record<string, SessionStep[]>; // by date
+  sing: SingEntry[];
+  roots: RootAnswer[];
+  rush: RushRun[];
 }
 
 export interface AppState {
@@ -129,6 +155,9 @@ export function defaultProgress(): Progress {
     tuner: [],
     practiceSeconds: {},
     sessionDone: {},
+    sing: [],
+    roots: [],
+    rush: [],
   };
 }
 export function defaultState(): AppState {
@@ -164,6 +193,9 @@ export function normalizeState(raw: unknown): AppState {
       firstNote: obj(p.firstNote, {}),
       practiceSeconds: obj(p.practiceSeconds, {}),
       sessionDone: obj(p.sessionDone, {}),
+      sing: arr(p.sing, []),
+      roots: arr(p.roots, []),
+      rush: arr(p.rush, []),
     },
   };
 }
@@ -250,6 +282,9 @@ export function recordChordAnswer(
   }
   return { progress: next, unlocked: null };
 }
+export const rushBest = (p: Progress) => p.rush.reduce((m, r) => Math.max(m, r.score), 0);
+export const appendCapped = <T,>(arr: T[], item: T) => capped(arr, item);
+
 export function markStepDone(p: Progress, step: SessionStep, today = dayKey()): Progress {
   const cur = p.sessionDone[today] ?? [];
   if (cur.includes(step)) return p;
@@ -276,4 +311,13 @@ export function quizWeights(p: Progress, notes: PC[], last: PC | null): number[]
     if (pc === last) w *= 0.35;
     return w;
   });
+}
+
+/** Pick the next quiz-style note (weighted by weakness) inside the user's octave range. */
+export function pickNoteMidi(s: AppState, last: PC | null): { midi: number; pc: PC } {
+  const set = unlockedNotes(s.progress);
+  const pc = pickWeighted(set, quizWeights(s.progress, set, last));
+  const options = midisOfPc(pc, s.settings.lowMidi, s.settings.highMidi);
+  const midi = options.length ? options[randInt(0, options.length - 1)] : 60 + pc;
+  return { midi, pc };
 }

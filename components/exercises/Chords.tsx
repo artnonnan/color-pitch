@@ -6,6 +6,7 @@ import { CHORD_INTERVALS, CHORD_QUALITIES, CHORD_SYMBOL, pick, randInt, type Cho
 import { playChord, stopAll } from "@/lib/audio";
 import { markStepDone, recentChordAccuracy, recordChordAnswer, unlockedChords, UNLOCK_WINDOW } from "@/lib/state";
 import { Button, Card, ProgressBar, ScreenHeader, cx } from "../ui";
+import { fireworks } from "../fx/Burst";
 import { t } from "@/i18n";
 
 const ROUND_MS = 3 * 60 * 1000;
@@ -81,6 +82,11 @@ export function Chords({ onDone, onBack, sessionLabel }: { onDone: () => void; o
     setShown({ q: chord.q, ok, unlocked });
     setPhase("mood");
     if (!ok) void playChord(chord.midis, 1.6); // hear it again while seeing its true mood
+    // (assigned inside the setProgress callback, so TS can't see it isn't null)
+    const u = unlocked as ChordQuality | null;
+    if (u) {
+      window.setTimeout(() => fireworks([settings.chordMoods[u].color, "#ffffff"], 6), 200);
+    }
     timer.current = window.setTimeout(() => {
       if (Date.now() - roundStart.current >= ROUND_MS) {
         setPhase("summary");

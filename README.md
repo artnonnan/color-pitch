@@ -47,7 +47,12 @@ Daily session (~10–15 min), started with one button:
 | 2 | **Note + color quiz** (~5 min) | A random piano note in C3–C5. Answer on a colored keyboard. A correct answer flashes the note's color across the screen. A wrong answer plays both notes. **Progressive unlock:** start with C and G; ≥ 90 % over the last 30 answers on the current set unlocks the next note (C, G, E, A, D, F, B, then the black keys). Hard mode hides the colors. |
 | 3 | **Chord colors & moods** (~3 min) | Name the chord quality (major/minor first, then maj7, sus4, dim, aug, using the same 90 %/30 rule). Every answer shows a full-screen mood card (color + image + mood word) for about 1.7 s. |
 | 4 | **Mode brightness** | Unlocks in week 4, or once all 7 white keys are unlocked. Hear a C scale in one of 7 modes and place it on a bright-to-dark slider (Lydian → Locrian). The background shifts with your choice. |
+| 6 | **Color Rush** | A 60-second speed round. Combos raise the multiplier (x2 every 5 in a row, capped at x5), fast answers earn a bonus, and the high score is saved. Answers count toward the normal unlocks. |
+| 7 | **Sing the Color** | See only a color, with no note name, and sing its pitch. The mic grades it (within ±50¢ of the right note counts). This trains color → pitch, the reverse direction. If the mic fails, tap the key instead (keys have no colors). |
+| 8 | **Chord Root** | Hear a chord and tap its root note. This is absolute pitch inside harmony. |
 | 5 | **Pocket tuner** | Hear a sound in daily life: tap your guess, then measure. Shows the real note and its color, and logs your accuracy. |
+
+**Visual feedback:** particle bursts in the note's color on correct answers, a combo counter (its color is fixed so it never gives away the answer), a full-screen ceremony when a note unlocks, a slowly drifting aurora in your unlocked colors, and fireworks for new high scores and finished sessions. All of it respects "reduce motion".
 
 The 4-week curriculum on the home screen is guidance only. Unlocks follow your accuracy.
 
@@ -80,6 +85,10 @@ lib/pitch.ts         microphone pitch detection
 i18n/th.ts           all UI strings
 public/sw.js         offline service worker
 ```
+
+## Verification scripts
+
+With a production server on port 3123 (`npm run build && npm start -- -p 3123`), drive the app in Edge: `scripts/verify-edge.cjs` (main flow / mic denied), `verify-new-exercises.cjs`, `verify-resume.cjs` (audio after screen lock), `verify-ios-mic.cjs` (simulated iOS audio-session rules). The mic tests need a `c4.wav` next to the script.
 
 ## Verification hooks
 

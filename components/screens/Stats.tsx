@@ -3,10 +3,11 @@ import { useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import { colorOf } from "@/lib/colors";
 import { CHORD_QUALITIES, NOTE_UNLOCK_ORDER, nameOf, type PC } from "@/lib/music";
-import { addDays, dayKey, parseDay, streak } from "@/lib/state";
+import { addDays, dayKey, parseDay, rushBest, streak } from "@/lib/state";
 import { Card, ScreenHeader, cx } from "../ui";
 import { t } from "@/i18n";
 
+const pctOf = (hit: number, n: number) => (n ? `${Math.round((hit / n) * 100)}%` : "–");
 const fmtDay = (k: string) => parseDay(k).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
 
 function Section({ title, sub, children, table }: { title: string; sub?: string; children: ReactNode; table?: ReactNode }) {
@@ -365,6 +366,15 @@ export function Stats() {
             </table>
           </div>
         )}
+      </Section>
+
+      {/* New exercises */}
+      <Section title={t.stats.games}>
+        <div className="grid grid-cols-3 gap-2">
+          <Tile value={rushBest(p) || "–"} label={t.stats.rushBest} />
+          <Tile value={pctOf(p.sing.filter((x) => (x.cents !== null ? Math.abs(x.cents) <= 50 : x.answer === x.target)).length, p.sing.length)} label={t.stats.singAcc} />
+          <Tile value={pctOf(p.roots.filter((x) => x.answer === x.target).length, p.roots.length)} label={t.stats.rootAcc} />
+        </div>
       </Section>
 
       {/* Chords + tuner */}

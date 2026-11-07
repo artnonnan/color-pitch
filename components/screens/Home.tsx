@@ -2,7 +2,7 @@
 import { useStore } from "@/lib/store";
 import { colorOf } from "@/lib/colors";
 import { CHORD_QUALITIES, NOTE_UNLOCK_ORDER, nameOf } from "@/lib/music";
-import { currentWeek, dayKey, modesUnlocked, streak, type SessionStep } from "@/lib/state";
+import { currentWeek, dayKey, modesUnlocked, rushBest, streak, type SessionStep } from "@/lib/state";
 import { Button, Card, NoteDot, cx } from "../ui";
 import { t } from "@/i18n";
 import type { Screen } from "../App";
@@ -18,6 +18,11 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
   const anyDone = SESSION_STEPS.some((s) => done.includes(s));
   const st = streak(progress, today);
   const week = currentWeek(progress, today);
+  const noteCols = (() => {
+    const cs = NOTE_UNLOCK_ORDER.slice(0, Math.max(progress.notesUnlocked, 3)).map((pc) => colorOf(settings.noteColors, pc));
+    return cs.length > 1 ? cs : [...cs, "#a855f7"];
+  })();
+  const best = rushBest(progress);
   const trainedToday = done.length > 0 || (progress.practiceSeconds[today] ?? 0) >= 30;
 
   const stepInfo: Record<SessionStep, { title: string; time: string; screen: Screen }> = {
@@ -155,9 +160,49 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
       </Card>
 
       {/* more */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <h2 className="px-1 font-bold">{t.home.moreExercises}</h2>
+        <button
+          onClick={() => go("rush")}
+          data-testid="card-rush"
+          className="relative flex min-h-28 w-full items-center gap-4 overflow-hidden rounded-3xl p-4 text-left text-white active:scale-[0.98]"
+          style={{ background: `linear-gradient(120deg, ${noteCols.join(", ")})` }}
+        >
+          <span className="text-5xl drop-shadow">⚡</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xl font-black drop-shadow">{t.exercises.rush.title}</span>
+            <span className="block text-sm opacity-95 drop-shadow">{t.exercises.rush.desc}</span>
+            <span className="mt-1 inline-block rounded-full bg-black/25 px-2 py-0.5 text-xs font-bold">
+              🏆 {best ? t.rush.best(best) : t.rush.noBest}
+            </span>
+          </span>
+        </button>
         <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => go("sing")}
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="flex gap-1">
+              {noteCols.slice(0, 3).map((c) => (
+                <span key={c} className="h-6 w-6 rounded-full" style={{ background: c, boxShadow: `0 0 12px ${c}` }} />
+              ))}
+              <span className="ml-1 text-xl">🎤</span>
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.sing.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.sing.desc}</span>
+            </span>
+          </button>
+          <button
+            onClick={() => go("roots")}
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="text-2xl">🎹</span>
+            <span>
+              <span className="block font-bold">{t.exercises.roots.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.roots.desc}</span>
+            </span>
+          </button>
           <button
             onClick={() => go("modes")}
             className="flex min-h-28 flex-col justify-between rounded-3xl p-4 text-left active:scale-[0.98]"

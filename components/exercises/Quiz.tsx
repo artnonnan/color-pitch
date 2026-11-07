@@ -7,6 +7,8 @@ import { playNote, playSequence, stopAll, wait } from "@/lib/audio";
 import { markStepDone, quizWeights, recentNoteAccuracy, recordNoteAnswer, unlockedNotes, UNLOCK_WINDOW } from "@/lib/state";
 import { Keyboard, type KeyFlash } from "../Keyboard";
 import { Button, Card, ColorWash, NoteDot, ProgressBar, ScreenHeader, cx } from "../ui";
+import { burstFrom, fireworks } from "../fx/Burst";
+import { Celebration, ComboBadge } from "../fx/Celebration";
 import { t } from "@/i18n";
 
 const ROUND_MS = 5 * 60 * 1000;
@@ -32,6 +34,8 @@ export function Quiz({ onDone, onBack, sessionLabel }: { onDone: () => void; onB
   const lastPc = useRef<PC | null>(null);
   const advanceTimer = useRef<number | null>(null);
   const k = useRef(0);
+  const [combo, setCombo] = useState(0);
+  const [ceremony, setCeremony] = useState<PC | null>(null);
 
   useEffect(() => () => {
     if (advanceTimer.current) window.clearTimeout(advanceTimer.current);
@@ -98,10 +102,17 @@ export function Quiz({ onDone, onBack, sessionLabel }: { onDone: () => void; onB
     setPhase("feedback");
     k.current++;
     setWash({ color: colorOf(settings.noteColors, targetPc), k: k.current });
+    const col = colorOf(settings.noteColors, targetPc);
     if (ok) {
+      const c = combo + 1;
+      setCombo(c);
       setFlashes([{ pc, kind: "correct", k: k.current }]);
-      advanceTimer.current = window.setTimeout(nextOrSummary, newly !== null ? 2600 : 1200);
+      burstFrom(document.querySelector(`button[data-pc="${pc}"]`), [col, "#ffffff"], Math.min(3, 1 + c / 6));
+      if (c % 10 === 0) fireworks(unlockedNotes(getState().progress).map((x) => colorOf(settings.noteColors, x)), 5);
+      // An unlock waits for the ceremony to be dismissed instead of auto-advancing.
+      if (newly === null) advanceTimer.current = window.setTimeout(nextOrSummary, 1200);
     } else {
+      setCombo(0);
       setFlashes([
         { pc, kind: "wrong", k: k.current },
         { pc: targetPc, kind: "reveal", k: k.current },
@@ -109,11 +120,15 @@ export function Quiz({ onDone, onBack, sessionLabel }: { onDone: () => void; onB
       // Real note, then the note they picked (same octave), so the difference is heard.
       const picked = target - targetPc + pc;
       void wait(150).then(() => playSequence([target, picked], 0.9, 0.85));
-      advanceTimer.current = window.setTimeout(nextOrSummary, 3200);
+      if (newly === null) advanceTimer.current = window.setTimeout(nextOrSummary, 3200);
     }
     if (newly !== null) {
-      const nm = newly;
-      void wait(ok ? 900 : 2200).then(() => playNote(60 + nm));
+      const nm: PC = newly;
+      // Let the answer feedback land, then the full-screen ceremony + the new note's sound.
+      void wait(ok ? 700 : 2300).then(() => {
+        setCeremony(nm);
+        void playNote(60 + nm, 2.2);
+      });
     }
   };
 
@@ -137,6 +152,18 @@ export function Quiz({ onDone, onBack, sessionLabel }: { onDone: () => void; onB
         }
       />
       {wash && <ColorWash color={wash.color} k={wash.k} />}
+      {ceremony !== null && (
+        <Celebration
+          color={colorOf(settings.noteColors, ceremony)}
+          label={nameOf(ceremony)}
+          title={t.fx.newNote}
+          sub={t.fx.newNoteSub(nameOf(ceremony))}
+          onClose={() => {
+            setCeremony(null);
+            nextOrSummary();
+          }}
+        />
+      )}
 
       <div className="relative z-[11] flex flex-1 flex-col gap-4">
         <Card className="space-y-2">
@@ -172,6 +199,9 @@ export function Quiz({ onDone, onBack, sessionLabel }: { onDone: () => void; onB
           )}
           {phase === "question" && (
             <div className="space-y-3">
+              <div className="flex h-9 justify-center">
+                <ComboBadge combo={combo} />
+              </div>
               <div className="text-5xl">🎧</div>
               <p className="text-lg text-ink-2">{t.quiz.listen}</p>
               <Button variant="secondary" onClick={() => target !== null && void playNote(target)}>

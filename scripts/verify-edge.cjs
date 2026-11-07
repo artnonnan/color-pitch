@@ -1,6 +1,7 @@
-// Drives Color Pitch in Edge like a player on a 375px phone and records evidence.
-// usage: (npm start -- -p 3123) then: node scripts/verify-edge.cjs <main|denied> <outDir>
+// usage: npm start -- -p 3123, then node scripts/verify-edge.cjs <main|denied> <outDir>
 // The fake microphone plays c4.wav from this folder (a 261.63 Hz sine, 48 kHz mono 16-bit).
+// Drives Color Pitch in Edge like a player on a 375px phone and records evidence.
+// usage: node verify.cjs <flow: main|denied> <outDir>
 const path = require("path");
 const fs = require("fs");
 const puppeteer = require(process.env.PUPPETEER_CORE || "D:/Engine/featuremap/harness/web/node_modules/puppeteer-core");
@@ -56,6 +57,11 @@ const note = (k, v) => {
     if (!el) throw new Error(`no button matching ${re}`);
     await el.tap();
   };
+  const tapNav = async (label) => {
+    const h = await page.evaluateHandle((l) => [...document.querySelectorAll("nav button")].find((b) => b.textContent.includes(l)) || null, label);
+    if (!h.asElement()) throw new Error(`no nav button ${label}`);
+    await h.asElement().tap();
+  };
   const bodyText = () => page.evaluate(() => document.body.innerText);
 
   await page.goto(URL, { waitUntil: "networkidle0" });
@@ -66,9 +72,12 @@ const note = (k, v) => {
     await sleep(600);
     await tapText(/ฮัมใส่ไมค์/);
     await sleep(2500);
+    await page.evaluate(() => document.querySelector('[role=alert] details')?.setAttribute("open", ""));
     const txt = await bodyText();
     note("denied.sliderShown", /เลื่อนแถบ/.test(txt));
-    note("denied.message", txt.match(/ไม่ได้รับอนุญาต[^\n]*/)?.[0] ?? "(none)");
+    await page.evaluate(() => document.querySelector("[role=alert] details")?.setAttribute("open", ""));
+    await sleep(200);
+    note("denied.alert", await page.evaluate(() => document.querySelector("[role=alert]")?.innerText ?? "(none)"));
     await shot("denied-01-slider-fallback");
     // Use the slider fallback like a player: drag via keyboard steps, then confirm.
     await page.focus('input[aria-label="pitch slider"]');
@@ -126,15 +135,21 @@ const note = (k, v) => {
       wrongShot = true;
     }
     if (q === 0) await shot("07-quiz-correct-feedback");
-    const txt = await bodyText();
-    if (!unlockShot && /ปลดล็อกโน้ตใหม่/.test(txt)) {
-      await shot("08-quiz-unlock");
-      note("quiz.unlockedAtAnswer", q + 1);
-      unlockShot = true;
-    }
-    // wait until the next question is on screen (keys enabled + prompt shown)
+    // wait until the next question is on screen (keys enabled + prompt shown);
+    // an unlock shows a full-screen ceremony that the player taps to dismiss.
     for (let i = 0; i < 60; i++) {
       await sleep(150);
+      if (await page.evaluate(() => /แตะเพื่อไปต่อ/.test(document.body.innerText))) {
+        if (!unlockShot) {
+          await sleep(900);
+          await shot("08-quiz-unlock-ceremony");
+          note("quiz.unlockedAtAnswer", q + 1);
+          unlockShot = true;
+        }
+        await page.touchscreen.tap(187, 650);
+        await sleep(300);
+        continue;
+      }
       const ready = await page.evaluate(
         () => document.querySelector('button[data-pc="0"]').getAttribute("aria-disabled") === "false" && /ฟังแล้วแตะคีย์ที่ใช่/.test(document.body.innerText),
       );
@@ -188,21 +203,21 @@ const note = (k, v) => {
   await shotFull("15-home-after-reload");
 
   // Stats / settings / light mode
-  await tapText(/สถิติ/);
+  await tapNav("สถิติ");
   await sleep(600);
   await shotFull("16-stats");
-  await tapText(/ตั้งค่า/);
+  await tapNav("ตั้งค่า");
   await sleep(600);
   await shotFull("17-settings");
   await tapText(/สว่าง$/);
   await sleep(500);
-  await tapText(/หน้าแรก/);
+  await tapNav("หน้าแรก");
   await sleep(500);
   await shot("18-home-light");
   note("theme.attr", await page.evaluate(() => document.documentElement.dataset.theme));
 
   // Tuner with the C4 fake mic: guess C first, then detect.
-  await tapText(/จับเสียง/);
+  await tapNav("จับเสียง");
   await sleep(500);
   await (await page.$('button[data-pc="0"]')).tap();
   await sleep(200);
