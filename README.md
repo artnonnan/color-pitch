@@ -50,11 +50,15 @@ Daily session (~10–15 min), started with one button:
 | 6 | **Color Rush** | A 60-second speed round. Combos raise the multiplier (x2 every 5 in a row, capped at x5), fast answers earn a bonus, and the high score is saved. Answers count toward the normal unlocks. |
 | 7 | **Sing the Color** | See only a color, with no note name, and sing its pitch. The mic grades it (within ±50¢ of the right note counts). This trains color → pitch, the reverse direction. If the mic fails, tap the key instead (keys have no colors). |
 | 8 | **Chord Root** | Hear a chord and tap its root note. This is absolute pitch inside harmony. |
+| 9 | **Scale Degrees** | A I–IV–V–I cadence sets a random major key, then one note plays. Tap its degree (1–7, with solfège and a feeling word). Feedback names the real note in its own color, then the note walks home to 1 (2–5 down, 6–7 up). Degrees unlock 1, 5, 3 → 2, 4, 6, 7 by the same 90 %/30 rule. This is "functional ear training": relative hearing, linked back to absolute colors. |
+| 10 | **Intervals** | Hear two notes (up, down, together, or mixed) and name the distance. The feedback blends the two notes' colors. Unlock order: P8, P5, M3, then P4, m3, M2, m2, M6, m6, M7, m7, tritone. |
 | 5 | **Pocket tuner** | Hear a sound in daily life: tap your guess, then measure. Shows the real note and its color, and logs your accuracy. |
 
 **Visual feedback:** particle bursts in the note's color on correct answers, a combo counter (its color is fixed so it never gives away the answer), a full-screen ceremony when a note unlocks, a slowly drifting aurora in your unlocked colors, and fireworks for new high scores and finished sessions. All of it respects "reduce motion".
 
 The 4-week curriculum on the home screen is guidance only. Unlocks follow your accuracy.
+
+**Mix voices (Settings → Instrument → Mix):** every new question uses a different voice (piano, sine, soft triangle, FM bell, filtered strings). A 2025 University of Surrey study found that adults' pitch-label training carried over to an instrument they had not trained on. Mixing timbres here pushes the same way: learn the note, not the piano.
 
 **Default colors:** C red, D orange, E yellow, F green, G sky blue, A blue, B purple. Black keys blend their neighbors (C# = red-orange). Change them in Settings, because self-chosen colors stick better.
 
@@ -93,3 +97,7 @@ With a production server on port 3123 (`npm run build && npm start -- -p 3123`),
 ## Verification hooks
 
 For automated checks (read-only): `window.__colorPitch()` returns the app state, `window.__cpAudio()` returns the audio status, and `window.__cpQuestion` holds the current quiz/chord question.
+
+## Verification
+
+The project skill [`.claude/skills/verify-color-pitch/`](.claude/skills/verify-color-pitch/SKILL.md) launches the production build and drives it in headless Edge like a player on a 375 px iPhone. It runs through [`scripts/drive.cjs`](scripts/drive.cjs). The feature map is in `features/`, and the recipes are in `recipes/`. Evidence goes to `verification/` (gitignored).
