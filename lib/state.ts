@@ -7,6 +7,7 @@ import {
   INITIAL_DEGREES,
   INITIAL_INTERVALS,
   INTERVALS,
+  MODES,
   INITIAL_CHORDS,
   INITIAL_NOTES,
   INITIAL_NUMERALS,
@@ -63,6 +64,10 @@ export interface ModeAnswer {
   t: number;
   target: Mode;
   answer: Mode;
+  /** Level the question was asked at (0–3). Missing on answers from before levels existed. */
+  level?: number;
+  /** Compared the choices before answering: logged, never counts toward levels. */
+  hinted?: boolean;
 }
 export interface FirstNoteEntry {
   target: PC;
@@ -173,6 +178,9 @@ export interface Progress {
   /** The intro lesson (I = home, V = tension, IV = open) was finished once. */
   progLessonSeen: boolean;
   intervalLessonSeen: boolean;
+  modeLevel: number; // index into MODE_LEVELS
+  modeLevelSince: number;
+  modeLessonSeen: boolean;
   degreeLessonSeen: boolean;
   melodyLevel: number; // index into MELODY_LENGTHS
   melodySetSince: number;
@@ -247,6 +255,9 @@ export function defaultProgress(): Progress {
     progLevelSince: 0,
     progLessonSeen: false,
     intervalLessonSeen: false,
+    modeLevel: 0,
+    modeLevelSince: 0,
+    modeLessonSeen: false,
     degreeLessonSeen: false,
     melodyLevel: 0,
     melodySetSince: 0,
@@ -334,6 +345,39 @@ export function currentWeek(p: Progress, today = dayKey()): number {
 }
 /** Mode brightness opens in week 4, or once all 7 white keys are unlocked. */
 export const modesUnlocked = (p: Progress) => currentWeek(p) >= 4 || p.notesUnlocked >= 7;
+
+/**
+ * Mode levels, easiest first. Each moves on by the 30-answer, >= 90 % rule.
+ *   0: bright or dark: Ionian vs Aeolian (the third decides)
+ *   1: the bright family: Lydian, Ionian, Mixolydian (one note apart)
+ *   2: the dark family: Dorian, Aeolian, Phrygian (one note apart)
+ *   3: all seven on the brightness slider (exact position counts)
+ */
+export const MODE_LEVELS: { modes: Mode[] }[] = [
+  { modes: ["ionian", "aeolian"] },
+  { modes: ["lydian", "ionian", "mixolydian"] },
+  { modes: ["dorian", "aeolian", "phrygian"] },
+  { modes: [...MODES] },
+];
+export const MODE_LAST_LEVEL = MODE_LEVELS.length - 1;
+export const modeLevelOf = (p: Progress) => Math.min(Math.max(p.modeLevel | 0, 0), MODE_LAST_LEVEL);
+export const recentModeAccuracy = (p: Progress) =>
+  recent(
+    p.modeAnswers.filter((a) => !a.hinted && (a.level ?? MODE_LAST_LEVEL) === modeLevelOf(p)),
+    p.modeLevelSince,
+    (a) => a.target === a.answer,
+  );
+/** Record a mode answer; returns the new level if this answer completed the current one. */
+export function recordModeAnswer(p: Progress, a: ModeAnswer): { progress: Progress; levelUp: number | null } {
+  let next: Progress = { ...p, modeAnswers: capped(p.modeAnswers, a) };
+  if (a.hinted || modeLevelOf(next) >= MODE_LAST_LEVEL) return { progress: next, levelUp: null };
+  if (meetsUnlock(recentModeAccuracy(next))) {
+    const levelUp = modeLevelOf(next) + 1;
+    next = { ...next, modeLevel: levelUp, modeLevelSince: a.t + 1 };
+    return { progress: next, levelUp };
+  }
+  return { progress: next, levelUp: null };
+}
 
 export function firstNoteTarget(p: Progress, today = dayKey()): PC {
   return FIRST_NOTE_ROTATION[(currentWeek(p, today) - 1) % FIRST_NOTE_ROTATION.length];

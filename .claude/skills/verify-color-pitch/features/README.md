@@ -37,12 +37,12 @@ Each feature file starts with an H1 title and one paragraph that describes what 
 - [Profiles and cloud sync](./profiles.md) covers the อาท / Guest picker on every open, separate progress per profile, and Supabase sync across devices.
 - [Chord progressions](./progressions.md) covers an intro lesson (I = home, V = tension, IV = open), then four levels from "I then IV or V" up to four chords, with a hint that doesn't count and per-slot replay.
 - [Melody](./melody.md) covers melodic dictation with absolute pitch: hearing a melody of unlocked notes and tapping it back, with melodies growing from 3 to 6 notes.
+- [Mode brightness](./modes.md) covers the week-4 lock, an intro lesson, and four levels from bright/dark up to the seven-mode slider, with the differing notes highlighted.
 - [Mix voices](./mix-voices.md) covers the "สลับเสียง" instrument setting, which changes timbre on every question.
 
 Not mapped yet. Each still has an older script in `scripts/` that needs porting to `drive.cjs`:
 - daily session runner and First Note (`verify-edge.cjs`)
 - Chords
-- Modes
 - Color Rush, Sing, Roots (`verify-new-exercises.cjs`)
 - Tuner
 - Stats

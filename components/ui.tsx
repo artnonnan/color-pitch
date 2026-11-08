@@ -43,7 +43,7 @@ export function ScreenHeader({
   sub?: ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-20 -mx-4 mb-3 flex items-center gap-2 bg-bg/85 px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
+    <header className="sticky top-0 z-20 -mx-4 mb-3 flex items-center gap-2 bg-bg/85 text-ink px-2 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur">
       {onBack ? (
         <button
           onClick={onBack}

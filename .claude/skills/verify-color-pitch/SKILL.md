@@ -64,6 +64,7 @@ Existing recipes:
 | `recipes/voices.js` | [mix-voices](features/mix-voices.md) |
 | `recipes/progressions.js` | [progressions](features/progressions.md) |
 | `recipes/melody.js` | [melody](features/melody.md) |
+| `recipes/modes.js` (clock +28 days to pass the week-4 lock) | [modes](features/modes.md) |
 | `recipes/profiles.js` (`--profile none`) | [profiles](features/profiles.md) |
 | `recipes/sync-write.js` then `sync-read.js` (`--cloud --profile none`, writes the real guest row) | [profiles](features/profiles.md) |
 
