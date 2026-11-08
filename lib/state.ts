@@ -139,6 +139,39 @@ export interface MelodyNoteAnswer {
   target: PC;
   answer: PC;
 }
+/** One Color Rain game. */
+export interface RainRun {
+  t: number;
+  score: number;
+  caught: number;
+  missed: number;
+  wrong: number;
+  maxCombo: number;
+  /** Gray drops: the color was hidden, so only the sound told the note. */
+  gray: boolean;
+  /** Seconds survived. */
+  secs: number;
+}
+/** One "ผสมสีคอร์ด" answer: the player taps every note of a chord. */
+export interface MixChordAnswer {
+  t: number;
+  root: PC;
+  quality: ChordQuality;
+  /** Pitch classes in the chord. */
+  target: PC[];
+  /** Pitch classes the player tapped. */
+  answer: PC[];
+}
+/** One finished memory-match board. */
+export interface MatchGame {
+  t: number;
+  pairs: number;
+  /** Pairs of cards turned over (a perfect game = pairs). */
+  moves: number;
+  ms: number;
+  /** Colors shown when a card is turned (easy) or only after a match (hard). */
+  colors: boolean;
+}
 export interface RushRun {
   t: number;
   score: number;
@@ -164,6 +197,9 @@ export interface Progress {
   sing: SingEntry[];
   roots: RootAnswer[];
   rush: RushRun[];
+  rain: RainRun[];
+  mixChords: MixChordAnswer[];
+  matchGames: MatchGame[];
   degreesUnlocked: number; // count into DEGREE_UNLOCK_ORDER
   degreesSetSince: number;
   degrees: DegreeAnswer[];
@@ -242,6 +278,9 @@ export function defaultProgress(): Progress {
     sing: [],
     roots: [],
     rush: [],
+    rain: [],
+    mixChords: [],
+    matchGames: [],
     degreesUnlocked: INITIAL_DEGREES,
     degreesSetSince: 0,
     degrees: [],
@@ -300,6 +339,9 @@ export function normalizeState(raw: unknown): AppState {
       sing: arr(p.sing, []),
       roots: arr(p.roots, []),
       rush: arr(p.rush, []),
+      rain: arr(p.rain, []),
+      mixChords: arr(p.mixChords, []),
+      matchGames: arr(p.matchGames, []),
       degrees: arr(p.degrees, []),
       intervals: arr(p.intervals, []),
       progressions: arr(p.progressions, []),
@@ -529,6 +571,12 @@ export function recordMelody(
   return { progress: next, grewTo };
 }
 export const rushBest = (p: Progress) => p.rush.reduce((m, r) => Math.max(m, r.score), 0);
+export const rainBest = (p: Progress) => p.rain.reduce((m, r) => Math.max(m, r.score), 0);
+/** Fewest moves for a full board of `pairs` pairs (0 = never finished). */
+export const matchBest = (p: Progress, pairs: number) =>
+  p.matchGames.filter((g) => g.pairs === pairs).reduce((m, g) => (m === 0 ? g.moves : Math.min(m, g.moves)), 0);
+export const mixChordCorrect = (a: MixChordAnswer) =>
+  a.answer.length === a.target.length && a.target.every((pc) => a.answer.includes(pc));
 export const appendCapped = <T,>(arr: T[], item: T) => capped(arr, item);
 
 export function markStepDone(p: Progress, step: SessionStep, today = dayKey()): Progress {

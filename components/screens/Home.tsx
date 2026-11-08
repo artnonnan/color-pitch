@@ -2,7 +2,7 @@
 import { useStore } from "@/lib/store";
 import { colorOf, DEGREE_COLORS } from "@/lib/colors";
 import { CHORD_QUALITIES, NOTE_UNLOCK_ORDER, nameOf } from "@/lib/music";
-import { currentWeek, dayKey, modesUnlocked, rushBest, streak, type SessionStep } from "@/lib/state";
+import { currentWeek, dayKey, modesUnlocked, rainBest, rushBest, streak, type SessionStep } from "@/lib/state";
 import { Button, Card, NoteDot, cx } from "../ui";
 import { t } from "@/i18n";
 import type { Screen } from "../App";
@@ -192,7 +192,60 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
             </span>
           </span>
         </button>
+        <button
+          onClick={() => go("rain")}
+          data-testid="card-rain"
+          className="relative flex min-h-28 w-full items-center gap-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+        >
+          <span className="relative h-16 w-14 shrink-0">
+            {noteCols.slice(0, 3).map((c, i) => (
+              <span
+                key={c}
+                className="absolute h-5 w-5 rounded-full rounded-tl-none"
+                style={{ left: [2, 26, 12][i], top: [4, 18, 36][i], transform: "rotate(45deg)", background: c, boxShadow: `0 0 10px ${c}` }}
+              />
+            ))}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xl font-black">{t.exercises.rain.title}</span>
+            <span className="block text-sm text-ink-3">{t.exercises.rain.desc}</span>
+            <span className="mt-1 inline-block rounded-full bg-surface-2 px-2 py-0.5 text-xs font-bold">
+              🏆 {rainBest(progress) ? t.rain.best(rainBest(progress)) : t.rain.noBest}
+            </span>
+          </span>
+        </button>
         <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => go("mixchord")}
+            data-testid="card-mixchord"
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="relative h-7 w-14">
+              {noteCols.slice(0, 3).map((c, i) => (
+                <span key={c} className="absolute top-0 h-7 w-7 rounded-full mix-blend-screen" style={{ left: i * 12, background: c }} />
+              ))}
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.mixchord.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.mixchord.desc}</span>
+            </span>
+          </button>
+          <button
+            onClick={() => go("match")}
+            data-testid="card-match"
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="flex gap-1">
+              <span className="flex h-7 w-5 items-center justify-center rounded-md bg-surface-2 text-xs">♪</span>
+              <span className="h-7 w-5 rounded-md" style={{ background: noteCols[0] }} />
+              <span className="h-7 w-5 rounded-md" style={{ background: noteCols[0] }} />
+              <span className="ml-1 text-xl">🃏</span>
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.match.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.match.desc}</span>
+            </span>
+          </button>
           <button
             onClick={() => go("sing")}
             className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"

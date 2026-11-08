@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { useStore } from "@/lib/store";
 import { colorOf } from "@/lib/colors";
 import { CHORD_QUALITIES, NOTE_UNLOCK_ORDER, nameOf, type PC } from "@/lib/music";
-import { addDays, dayKey, parseDay, rushBest, streak } from "@/lib/state";
+import { addDays, dayKey, parseDay, rushBest, streak, rainBest, matchBest, mixChordCorrect } from "@/lib/state";
 import { Card, ScreenHeader, cx } from "../ui";
 import { t } from "@/i18n";
 
@@ -378,6 +378,9 @@ export function Stats() {
           <Tile value={pctOf(p.intervals.filter((x) => x.answer === x.target).length, p.intervals.length)} label={t.stats.intervalAcc} />
           <Tile value={pctOf(p.progressions.filter((x) => x.answer === x.target).length, p.progressions.length)} label={t.stats.progressionAcc} />
           <Tile value={pctOf(p.melodies.filter((x) => x.answer === x.target).length, p.melodies.length)} label={t.stats.melodyAcc} />
+          <Tile value={rainBest(p) || "–"} label={t.stats.rainBest} />
+          <Tile value={pctOf(p.mixChords.filter(mixChordCorrect).length, p.mixChords.length)} label={t.stats.mixChordAcc} />
+          <Tile value={matchBest(p, 6) || "–"} label={t.stats.matchBest} />
         </div>
       </Section>
 

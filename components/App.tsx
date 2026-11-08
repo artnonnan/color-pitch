@@ -18,6 +18,9 @@ import { Degrees } from "./exercises/Degrees";
 import { Intervals } from "./exercises/Intervals";
 import { Progressions } from "./exercises/Progressions";
 import { Melody } from "./exercises/Melody";
+import { Rain } from "./exercises/Rain";
+import { MixChord } from "./exercises/MixChord";
+import { Match } from "./exercises/Match";
 import { BurstLayer, clearBursts, fireworks } from "./fx/Burst";
 import { Aurora } from "./fx/Aurora";
 import { colorOf } from "@/lib/colors";
@@ -28,10 +31,10 @@ import { t } from "@/i18n";
 
 export type Screen =
   | "home" | "first" | "quiz" | "chords" | "modes" | "tuner" | "stats" | "settings" | "session"
-  | "rush" | "sing" | "roots" | "degrees" | "intervals" | "progressions" | "melody";
-const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody"];
+  | "rush" | "sing" | "roots" | "degrees" | "intervals" | "progressions" | "melody" | "rain" | "mixchord" | "match";
+const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match"];
 // Screens that play notes: the daily first note should come before any of them.
-const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody"];
+const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match"];
 const NAV: { s: Screen; icon: string; label: string }[] = [
   { s: "home", icon: "🏠", label: t.nav.home },
   { s: "tuner", icon: "📻", label: t.nav.tuner },
@@ -137,6 +140,12 @@ function Shell() {
     body = <Progressions onBack={home} />;
   } else if (screen === "melody") {
     body = <Melody onBack={home} />;
+  } else if (screen === "rain") {
+    body = <Rain onBack={home} />;
+  } else if (screen === "mixchord") {
+    body = <MixChord onBack={home} />;
+  } else if (screen === "match") {
+    body = <Match onBack={home} />;
   } else if (screen === "tuner") {
     body = <Tuner />;
   } else if (screen === "stats") {
