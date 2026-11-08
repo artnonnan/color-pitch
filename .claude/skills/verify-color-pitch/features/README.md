@@ -37,6 +37,7 @@ Each feature file starts with an H1 title and one paragraph that describes what 
 - [Profiles and cloud sync](./profiles.md) covers the อาท / Guest picker on every open, separate progress per profile, and Supabase sync across devices.
 - [Chord progressions](./progressions.md) covers an intro lesson (I = home, V = tension, IV = open), then four levels from "I then IV or V" up to four chords, with a hint that doesn't count and per-slot replay.
 - [Melody](./melody.md) covers melodic dictation with absolute pitch: hearing a melody of unlocked notes and tapping it back, with melodies growing from 3 to 6 notes.
+- [Audio unlock and sound diagnostics](./audio-unlock.md) covers the first-tap unlock (from the profile picker), the silent media-channel loop, the session fallback, and the Settings diagnostics card.
 - [Mode brightness](./modes.md) covers the week-4 lock, an intro lesson, and four levels from bright/dark up to the seven-mode slider, with the differing notes highlighted.
 - [Mix voices](./mix-voices.md) covers the "สลับเสียง" instrument setting, which changes timbre on every question.
 
@@ -47,5 +48,5 @@ Not mapped yet. Each still has an older script in `scripts/` that needs porting 
 - Tuner
 - Stats
 - Settings colors and import/export
-- audio resume after background (`verify-resume.cjs`)
+- audio resume after background (`verify-resume.cjs`; the suspension path is now covered by `audio-unlock.js`)
 - iOS mic session (`verify-ios-mic.cjs`)

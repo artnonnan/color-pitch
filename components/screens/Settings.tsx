@@ -7,6 +7,7 @@ import { newVoice, playNote } from "@/lib/audio";
 import { defaultProgress, type Instrument } from "@/lib/state";
 import { exportJson, parseImport } from "@/lib/storage";
 import { Button, Card, ScreenHeader, cx } from "../ui";
+import { AudioCheck } from "../AudioUnlock";
 import { t } from "@/i18n";
 
 const OCTAVE_CHOICES = [36, 48, 60, 72, 84]; // C2..C6
@@ -271,6 +272,11 @@ export function SettingsScreen() {
         <Button variant="danger" className="w-full" onClick={doReset}>
           {t.settings.reset}
         </Button>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-bold">🔈 {t.audioDiag.title}</h2>
+        <AudioCheck />
       </Card>
 
       <Card className="space-y-2">

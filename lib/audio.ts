@@ -10,7 +10,9 @@
 //    the gesture and `Tone.start()`.
 //  - The ringer/silent switch mutes Web Audio by default. Setting
 //    `navigator.audioSession.type = "playback"` (Safari 17+) and playing a silent
-//    <audio> element in the gesture moves the page to the media channel.
+//    looping <audio> element (kept playing while visible) moves the page to the media
+//    channel. If the context still will not start after two taps, the session type falls
+//    back to "auto" (some in-app WebKit views, such as Chrome on iPhone, reject "playback").
 import { midiToFreq } from "./music";
 
 type ToneModule = typeof import("tone");
@@ -81,30 +83,98 @@ function silentWav(): string {
   return silentSrc;
 }
 
-/** Call synchronously inside a user gesture handler. Safe to call repeatedly. */
-export function unlockAudio() {
+// ---- diagnostics (shown when the player taps the "tap to enable sound" pill) ----
+const diag = {
+  attempts: 0,
+  /** Attempts made before Tone.js had loaded (they can't start audio). */
+  earlyAttempts: 0,
+  lastError: "",
+  states: [] as string[],
+  sessionMode: "playback" as "playback" | "auto",
+  silentLoop: "none",
+};
+const note = (e: unknown) => {
+  diag.lastError = String((e as Error)?.message ?? e).slice(0, 120);
+};
+export function audioDiagnostics() {
+  const nav = navigator as Navigator & { audioSession?: { type: string; state?: string } };
+  return {
+    browser: navigator.userAgent.replace(/^Mozilla\/5\.0 /, "").slice(0, 160),
+    context: Tone?.getContext().state ?? "not-loaded",
+    sampleRate: Tone?.getContext().sampleRate ?? null,
+    status,
+    audioSession: nav.audioSession ? `${nav.audioSession.type}${nav.audioSession.state ? ` / ${nav.audioSession.state}` : ""}` : "unsupported",
+    sessionMode: diag.sessionMode,
+    silentLoop: diag.silentLoop,
+    attempts: diag.attempts,
+    earlyAttempts: diag.earlyAttempts,
+    states: diag.states.join(" → ") || "-",
+    lastError: diag.lastError || "-",
+    pianoLoaded: !!piano?.loaded,
+    instrument,
+  };
+}
+
+function setSession() {
   try {
     const nav = navigator as Navigator & { audioSession?: { type: string } };
-    if (nav.audioSession) nav.audioSession.type = "playback";
-  } catch {
-    /* ignore */
+    if (nav.audioSession) nav.audioSession.type = diag.sessionMode;
+  } catch (e) {
+    note(e);
   }
+}
+
+// A looping silent <audio> keeps iOS on the media channel for as long as the page is
+// visible. A one-shot clip is not always enough, notably in in-app WebKit views
+// (Chrome and other browsers on iPhone).
+let loopEl: HTMLAudioElement | null = null;
+function keepMediaChannel() {
+  try {
+    if (!loopEl) {
+      loopEl = new Audio(silentWav());
+      loopEl.loop = true;
+      loopEl.setAttribute("playsinline", "");
+      loopEl.addEventListener("playing", () => (diag.silentLoop = "playing"));
+      loopEl.addEventListener("pause", () => (diag.silentLoop = "paused"));
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") loopEl?.pause();
+      });
+    }
+    void loopEl.play().catch((e) => {
+      diag.silentLoop = "blocked";
+      note(e);
+    });
+  } catch (e) {
+    note(e);
+  }
+}
+
+/** Call synchronously inside a user gesture handler. Safe to call repeatedly. */
+export function unlockAudio() {
+  setSession();
   if (isAudioRunning()) return;
+  diag.attempts++;
   // Re-played on every unlock, not just the first: after the screen locks or the
   // app goes to the background, iOS needs it again to get the media channel back.
-  try {
-    const a = new Audio(silentWav());
-    a.setAttribute("playsinline", "");
-    void a.play().catch(() => {});
-  } catch {
-    /* ignore */
-  }
+  keepMediaChannel();
   if (Tone) {
     watchContext();
     // Tone.start() calls context.resume() synchronously — that's what iOS needs.
-    void Tone.start().then(onRunning, () => {});
+    void Tone.start().then(onRunning, note);
     if (isAudioRunning()) onRunning();
+    // Still not running a moment after a real tap: in some WebKit views asking for the
+    // "playback" session is what keeps the context from starting. Ask for "auto" next time.
+    const attempt = diag.attempts;
+    window.setTimeout(() => {
+      if (!isAudioRunning() && attempt >= 2 && diag.sessionMode === "playback") {
+        const nav = navigator as Navigator & { audioSession?: unknown };
+        if (nav.audioSession) diag.sessionMode = "auto";
+      }
+    }, 700);
   } else {
+    // Too early: Tone.js is still downloading, and a later resume would be outside the
+    // gesture. The next tap will work; the pill stays up until then.
+    diag.earlyAttempts++;
     void preloadAudio().then(() => unlockAudio());
   }
 }
@@ -130,7 +200,10 @@ function watchContext() {
   if (watching || !Tone) return;
   watching = true;
   const raw = Tone.getContext().rawContext as unknown as BaseAudioContext;
+  diag.states.push(String(raw.state));
   raw.addEventListener("statechange", () => {
+    diag.states.push(String(raw.state));
+    if (diag.states.length > 8) diag.states.shift();
     if (isAudioRunning()) onRunning();
     else if (unlocked) setStatus("locked");
   });
@@ -244,6 +317,7 @@ if (typeof window !== "undefined") {
     voice: currentVoice(),
     voiceCounts: { ...voiceCounts },
     playCount,
+    diag: audioDiagnostics(),
   });
   // Test hook: suspend the context the way iOS does on screen lock / app switch.
   (window as unknown as { __cpAudioSuspend?: () => Promise<void> }).__cpAudioSuspend = async () => {

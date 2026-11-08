@@ -87,7 +87,14 @@ function Shell() {
   }, []);
   const home = useCallback(() => go("home"), [go]);
 
-  if (!profile) return <ProfilePicker />;
+  if (!profile) {
+    return (
+      <>
+        <ProfilePicker />
+        <AudioUnlock raised={false} />
+      </>
+    );
+  }
   if (!ready) {
     return <div className="flex min-h-dvh items-center justify-center text-ink-3">{t.appName}</div>;
   }
