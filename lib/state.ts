@@ -116,6 +116,10 @@ export interface ProgressionChordAnswer {
   pos: number;
   target: Numeral;
   answer: Numeral;
+  /** Level the question was asked at (0–3). Missing on answers from before levels existed. */
+  level?: number;
+  /** The player opened the hint (heard I→IV / I→V) first: logged, but never counts toward unlocks. */
+  hinted?: boolean;
 }
 /** One note slot of a dictated melody. */
 export interface MelodyNoteAnswer {
@@ -160,6 +164,10 @@ export interface Progress {
   numeralsUnlocked: number; // count into NUMERALS
   numeralsSetSince: number;
   progressions: ProgressionChordAnswer[];
+  progLevel: number; // index into PROG_LEVELS
+  progLevelSince: number;
+  /** The intro lesson (I = home, V = tension, IV = open) was finished once. */
+  progLessonSeen: boolean;
   melodyLevel: number; // index into MELODY_LENGTHS
   melodySetSince: number;
   melodies: MelodyNoteAnswer[];
@@ -229,6 +237,9 @@ export function defaultProgress(): Progress {
     numeralsUnlocked: INITIAL_NUMERALS,
     numeralsSetSince: 0,
     progressions: [],
+    progLevel: 0,
+    progLevelSince: 0,
+    progLessonSeen: false,
     melodyLevel: 0,
     melodySetSince: 0,
     melodies: [],
@@ -285,6 +296,27 @@ export const unlockedChords = (p: Progress): ChordQuality[] => CHORD_QUALITIES.s
 export const unlockedDegrees = (p: Progress): Degree[] => DEGREE_UNLOCK_ORDER.slice(0, p.degreesUnlocked);
 export const unlockedIntervals = (p: Progress): Interval[] => INTERVALS.slice(0, p.intervalsUnlocked);
 export const unlockedNumerals = (p: Progress): Numeral[] => NUMERALS.slice(0, p.numeralsUnlocked);
+
+/**
+ * Chord progression levels, easiest first. Each level moves on by the usual 30-answer,
+ * >= 90 % rule. Only the last level unlocks vi, ii and iii.
+ *   0: I then one chord, IV or V           (2 choices, 1 answer)
+ *   1: I then one chord, I, IV or V        (3 choices, 1 answer)
+ *   2: three chords from I, IV, V          (2 answers)
+ *   3: four chords from the unlocked set   (3 answers)
+ */
+export const PROG_LEVELS: { len: number; choices: Numeral[] | null }[] = [
+  { len: 2, choices: ["IV", "V"] },
+  { len: 2, choices: ["I", "IV", "V"] },
+  { len: 3, choices: ["I", "IV", "V"] },
+  { len: 4, choices: null },
+];
+export const PROG_LAST_LEVEL = PROG_LEVELS.length - 1;
+export function progSpec(p: Progress): { level: number; len: number; choices: Numeral[] } {
+  const level = Math.min(Math.max(p.progLevel | 0, 0), PROG_LAST_LEVEL);
+  const L = PROG_LEVELS[level];
+  return { level, len: L.len, choices: L.choices ?? unlockedNumerals(p) };
+}
 export const melodyLength = (p: Progress): number =>
   MELODY_LENGTHS[Math.min(Math.max(p.melodyLevel, 0), MELODY_LENGTHS.length - 1)];
 
@@ -340,7 +372,11 @@ export const recentIntervalAccuracy = (p: Progress) =>
   recent(p.intervals, p.intervalsSetSince, (a) => a.target === a.answer);
 
 export const recentProgressionAccuracy = (p: Progress) =>
-  recent(p.progressions, p.numeralsSetSince, (a) => a.target === a.answer);
+  recent(
+    p.progressions.filter((a) => !a.hinted),
+    p.progLevel < PROG_LAST_LEVEL ? p.progLevelSince : p.numeralsSetSince,
+    (a) => a.target === a.answer,
+  );
 export const recentMelodyAccuracy = (p: Progress) =>
   recent(p.melodies, p.melodySetSince, (a) => a.target === a.answer);
 
@@ -396,22 +432,31 @@ export function recordIntervalAnswer(
   }
   return { progress: next, unlocked: null };
 }
-/** Record every named chord of one progression; returns the newly unlocked chord, if any. */
+/**
+ * Record every named chord of one progression. Hinted answers are logged but never count.
+ * Returns the new level (levels 0–2) or the newly unlocked chord (last level), if any.
+ */
 export function recordProgression(
   p: Progress,
   answers: ProgressionChordAnswer[],
-): { progress: Progress; unlocked: Numeral | null } {
+): { progress: Progress; unlocked: Numeral | null; levelUp: number | null } {
   let next: Progress = p;
   let unlocked: Numeral | null = null;
+  let levelUp: number | null = null;
   for (const a of answers) {
     next = { ...next, progressions: capped(next.progressions, a) };
-    if (!unlocked && next.numeralsUnlocked < NUMERALS.length && meetsUnlock(recentProgressionAccuracy(next))) {
+    if (a.hinted || unlocked || levelUp !== null) continue;
+    if (!meetsUnlock(recentProgressionAccuracy(next))) continue;
+    // The rest of this progression shares the timestamp, so it counts toward the old set.
+    if (next.progLevel < PROG_LAST_LEVEL) {
+      levelUp = next.progLevel + 1;
+      next = { ...next, progLevel: levelUp, progLevelSince: a.t + 1, numeralsSetSince: a.t + 1 };
+    } else if (next.numeralsUnlocked < NUMERALS.length) {
       unlocked = NUMERALS[next.numeralsUnlocked];
-      // The rest of this progression shares the timestamp, so it counts toward the old set.
       next = { ...next, numeralsUnlocked: next.numeralsUnlocked + 1, numeralsSetSince: a.t + 1 };
     }
   }
-  return { progress: next, unlocked };
+  return { progress: next, unlocked, levelUp };
 }
 /** Record every note of one dictated melody; returns the new melody length if it grew. */
 export function recordMelody(

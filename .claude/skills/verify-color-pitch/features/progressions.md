@@ -1,21 +1,41 @@
 # Chord progressions (ทางเดินคอร์ด)
 
-The player hears four chords in a random major key. The first is always I. They tap the function of chords 2, 3 and 4 in order.
-- **Slots:** four slots sit above the answer grid. Slot 1 already shows I with its root color. Each slot lights up while its chord plays, and the slots fill with the player's picks.
-- **Feedback:** each slot reveals the real numeral, the chord name in that key (vi in G → "Em"), the ☀️/🌧️ mood of its quality, and its root note's color. A wrong slot gets a red ring and "คุณตอบ X". The progression then plays again with the names showing.
-- **Round:** a round is 8 progressions. The summary counts fully correct sets.
-- **Unlock:** I, IV and V start unlocked, then vi, ii and iii unlock by the 30-answer, ≥ 90 % rule. Each named chord counts as one answer, so one progression adds 3.
+The player hears chords in a random major key. The first chord is always I. They name the rest by function.
+- **Lesson:** a short lesson comes first.
+- **Levels:** four levels, easiest first.
+- **Hint:** a "💡 ใบ้" button lets the player compare I → each choice before answering.
+
+| Level | Plays | Choices | Answers |
+|---|---|---|---|
+| 1 | I + 1 chord | IV, V | 1 |
+| 2 | I + 1 chord (I → I allowed) | I, IV, V | 1 |
+| 3 | I + 2 chords, no repeats | I, IV, V | 2 |
+| 4 | I + 3 chords, no repeats | unlocked set (I, IV, V, then vi, ii, iii) | 3 |
+
+- **Moving up:** every level moves on by the 30-answer, ≥ 90 % rule (each named chord is one answer). Only level 4 unlocks vi, ii and iii.
+- **Hinted answers** are logged with `hinted: true` but never count toward a level or an unlock.
 
 ## Sub-features
 
-- `prog-play`: while the progression plays, the prompt reads "กำลังเล่นทางเดินคอร์ด…" and the numeral buttons are disabled. They open after about 4.4 s (4 chords × 1.1 s).
-- `prog-generate`: every progression starts on I and never repeats a chord back to back. Chords come only from the unlocked set. The key is random across all 12.
-- `prog-pick`: tapping a numeral fills the next slot. "⌫ ลบ" removes the last pick, and a removed pick is never logged. The third pick grades the set.
-- `prog-answer`: grading logs 3 entries `{t, key, pos: 2|3|4, target, answer}` to `progress.progressions`. The headline is "ถูกทั้งหมด!" or "ถูก N จาก 3 คอร์ด".
-- `prog-reveal`: the slots show the numeral, the chord name, the mood emoji and the root color, plus "คีย์ X เมเจอร์".
-- `prog-unlock`: crossing the unlock rule shows "🔓 ปลดล็อกคอร์ดใหม่: vi" with fireworks.
-- `prog-summary`: "ถูกทั้งชุด X จาก 8 ทาง", with a 🏆 at ≥ 6.
-- `prog-stats`: Stats → "แบบฝึกเพิ่มเติม" → the "ทางเดินคอร์ด" tile shows the all-time per-chord %.
+- `prog-lesson`: it opens automatically until `progress.progLessonSeen`, and later from "📖 เรียนก่อน" on the intro. There are 5 steps, all in C major:
+  1. Chords have functions.
+  2. I = home: plays I.
+  3. V = tension: plays I → V → I.
+  4. IV = open: plays I → IV → I.
+  5. Compare: "I → IV" and "I → V" buttons.
+
+  Each chord chip lights up as it plays. "เริ่มฝึก" sets `progLessonSeen` and starts the first question.
+- `prog-levels`: the card shows "ระดับ N/4" and the level description. Levels 1–3 show only their own choice buttons (2 or 3 large buttons). Level 4 shows all six with 🔒.
+- `prog-play`: buttons stay disabled while the chords play (1.1 s each). Each slot lights up as its chord sounds.
+- `prog-slot-replay`: tapping a slot during the question or the feedback plays that one chord.
+- `prog-hint`: "💡 ใบ้" opens "ฟังเทียบ: เริ่มจาก I แล้วไปที่…" with "▶ I → X" for each choice, in the question's key. The note says the question won't count.
+- `prog-pick`: picks fill the slots in order. "⌫ ลบ" appears only when there are 2 or more answers. The last pick grades.
+- `prog-answer`: grading logs `{t, key, pos, target, answer, level, hinted?}` per named chord to `progress.progressions`. The headline is "ถูกทั้งหมด!" or "ถูก N จาก M คอร์ด".
+- `prog-reveal`: each slot shows the numeral, the chord name in the key, the ☀️/🌧️ mood and the root note's color. A wrong slot gets a red ring and "คุณตอบ X". The progression replays.
+- `prog-levelup`: "🔓 ขึ้นระดับ N!" plus the new level's description, with fireworks.
+- `prog-unlock`: at level 4, "🔓 ปลดล็อกคอร์ดใหม่: vi".
+- `prog-summary`: after 10 questions, "ถูกทั้งชุด X จาก 10 ทาง".
+- `prog-stats`: the Stats tile "ทางเดินคอร์ด" shows the all-time per-chord %, hinted answers included.
 
 ## How to get to it (player POV)
 
@@ -25,24 +45,30 @@ The player hears four chords in a random major key. The first is always I. They 
 
 Preconditions:
 
-- `doctor` passes. Fresh profile: I, IV and V are unlocked.
+- `doctor` passes. Fresh profile: level 1, lesson not seen.
 
-- **Play one set.** Run `node scripts/drive.cjs .claude/skills/verify-color-pitch/recipes/progressions.js`. Round 2 taps a wrong chord and undoes it. Round 3 names chord 2 wrong. `after.json` shows:
-  - `closedWhilePlaying: true`
-  - `logged: 24`, `correctLogged: 23` (the undo did not log), `summary: "ถูกทั้งชุด 7 จาก 8 ทาง"`, `statsTile: "96%"`
-  - `chordsAsked` ⊆ [I, IV, V], `positions` = [2, 3, 4]
-  - `allStartOnI`, `noRepeats` and `allNamesOk` (each slot's chord name matches key + numeral) are true
-  - `distinctKeys` > 1
+- **Lesson → level 2 → level 3.** Run `node scripts/drive.cjs .claude/skills/verify-color-pitch/recipes/progressions.js` (about 6 min). Question 1 uses the hint, question 2 is a deliberate miss, and question 3 taps slot 2. `after.json` shows:
+  - `lessonShown: true`, `lessonSeen: true`.
+  - `lessonSteps` plays: null, 1, 3, 3, 4.
+  - `hintUsed.plays: 2`, `hintedLogged: 1`, `slotReplay: 1`.
+  - `levelUpText` = {"ขึ้นระดับ 2!": 31, "ขึ้นระดับ 3!": 61}. That is 1 hinted plus 30 counted, then 30 more.
+  - `level1Choices` = ["IV,V"], `level1Lens` = [2], `level2Choices` = ["I,IV,V"].
+  - `level3` = {len 3, slots 3, choices I/IV/V}.
+  - `numeralsUnlocked: 3`.
 - **Proof.**
-  - `02-playing.png`: buttons dimmed.
-  - `03-one-picked.png`: slot 2 holds a pick, and slots 3–4 show "?".
-  - `04-feedback-correct.png`.
-  - `05-feedback-wrong.png`: slot 2 has a red ring and "คุณตอบ X".
-  - `06-summary.png`, and `07-stats.png` with the tile.
-- **Unlock** (not in the recipe yet). 10 progressions at ≥ 90 % → `numeralsUnlocked: 4` (vi). It uses the same `meetsUnlock` rule as melody, which has been driven.
+  - `01-lesson-v.png`.
+  - `02-lesson-compare.png`.
+  - `03-level1-question.png`.
+  - `04-hint-panel.png`.
+  - `05-feedback-wrong.png`.
+  - `06-2-levelup.png`.
+  - `06-3-levelup.png`.
+  - `07-level3-question.png`.
+- **Level 4 and vi** have not been driven yet: it takes another 30 + 30 answers. Level 4 uses the same rule path, with `numeralsSetSince` reset at the level change.
 
 ## Gotchas
 
-- `__cpQuestion` is `{kind: "progression", key, tonic, chords}`. `chords[0]` is always "I", and the player answers `chords[1..3]`.
-- All 3 entries of one progression share a timestamp. If the unlock fires on the first of them, the other two count toward the old set (`numeralsSetSince = t + 1`). That is intended.
-- After grading, the progression replays and the auto-advance waits about 6.5 s. Tap `progressions-feedback` to skip.
+- `__cpQuestion` is `{kind: "progression", key, tonic, chords, choices, level}`. The player answers `chords[1..]`.
+- `recentProgressionAccuracy` drops hinted answers, then windows from `progLevelSince` (levels 1–3) or `numeralsSetSince` (level 4).
+- Players from before levels existed start at level 1 and see the lesson once. Their old answers have no `level`, and with `progLevelSince = 0` they sit inside the level-1 window. That's harmless, because the window is only the last 30 answers and new play pushes them out.
+- After a summary, the round restarts from the intro ("▶ เริ่ม"), not the lesson.

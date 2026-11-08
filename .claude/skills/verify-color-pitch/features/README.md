@@ -35,7 +35,7 @@ Each feature file starts with an H1 title and one paragraph that describes what 
 - [Scale degrees](./scale-degrees.md) covers functional ear training: a cadence sets the key, then the player names the degree of one note.
 - [Intervals](./intervals.md) covers hearing two notes and naming the distance, in four directions, with unlocks.
 - [Profiles and cloud sync](./profiles.md) covers the อาท / Guest picker on every open, separate progress per profile, and Supabase sync across devices.
-- [Chord progressions](./progressions.md) covers hearing four chords that start on I and naming chords 2–4 by function (I, IV, V, then vi, ii, iii).
+- [Chord progressions](./progressions.md) covers an intro lesson (I = home, V = tension, IV = open), then four levels from "I then IV or V" up to four chords, with a hint that doesn't count and per-slot replay.
 - [Melody](./melody.md) covers melodic dictation with absolute pitch: hearing a melody of unlocked notes and tapping it back, with melodies growing from 3 to 6 notes.
 - [Mix voices](./mix-voices.md) covers the "สลับเสียง" instrument setting, which changes timbre on every question.
 

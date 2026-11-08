@@ -182,12 +182,15 @@ export function diatonicTriad(tonic: number, n: Numeral): number[] {
   return [tonic - 12 + MAJOR_STEPS[i], ...upper.sort((a, b) => a - b)];
 }
 
-/** I followed by random chords from `set`, never the same chord twice in a row. */
-export function randomProgression(set: readonly Numeral[]): Numeral[] {
+/**
+ * I followed by random chords from `set`. With `noRepeat`, never the same chord twice in a
+ * row. Two-chord levels allow I → I, so "it stayed home" is a real answer.
+ */
+export function randomProgression(set: readonly Numeral[], len = PROGRESSION_LEN, noRepeat = true): Numeral[] {
   const out: Numeral[] = ["I"];
-  while (out.length < PROGRESSION_LEN) {
+  while (out.length < len) {
     const prev = out[out.length - 1];
-    const options = set.filter((x) => x !== prev);
+    const options = noRepeat ? set.filter((x) => x !== prev) : [...set];
     out.push(pick(options.length ? options : set));
   }
   return out;
