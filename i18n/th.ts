@@ -379,6 +379,26 @@ export const th = {
     avgMs: "เวลาเฉลี่ย",
   },
 
+  profile: {
+    title: "ใครกำลังฝึก?",
+    sub: "เลือกผู้ใช้ ความคืบหน้าจะซิงก์ทุกเครื่อง",
+    subLocal: "เลือกผู้ใช้ ความคืบหน้าแยกกันในเครื่องนี้",
+    names: { art: "อาท", guest: "Guest" } as Record<string, string>,
+    desc: {
+      art: "ความคืบหน้าของอาท",
+      guest: "ใช้ร่วมกัน ใครก็เล่นได้",
+    } as Record<string, string>,
+    last: "ใช้ล่าสุด",
+    current: "ผู้ใช้",
+    switch: "สลับผู้ใช้",
+    sync: {
+      off: "เก็บในเครื่องนี้",
+      syncing: "กำลังซิงก์…",
+      synced: "ซิงก์แล้ว",
+      offline: "ออฟไลน์ จะซิงก์เมื่อต่อเน็ต",
+    } as Record<string, string>,
+  },
+
   settings: {
     title: "ตั้งค่า",
     noteColors: "สีของโน้ต",

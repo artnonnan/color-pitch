@@ -64,9 +64,16 @@ The 4-week curriculum on the home screen is guidance only. Unlocks follow your a
 
 **Default colors:** C red, D orange, E yellow, F green, G sky blue, A blue, B purple. Black keys blend their neighbors (C# = red-orange). Change them in Settings, because self-chosen colors stick better.
 
-## Data
+## Data and profiles
 
-- Everything is stored in `localStorage` (key `color-pitch:v1`). There is no backend and no login. Every read and write is wrapped in try/catch, and private mode shows a warning.
+- **Picker on every open:** the app shows a picker: **1. อาท** or **2. Guest**. Each profile has its own progress and settings. There is no login and no PIN, by choice, and Guest is shared by everyone who picks it.
+- **Local copy:** each profile is kept in `localStorage` (`color-pitch:v1:<profile>` plus a `:ts` timestamp). Progress from before profiles existed (`color-pitch:v1`) moves into อาท. Every read and write is wrapped in try/catch, and private mode shows a warning.
+- **Cloud sync (Supabase):**
+  - Each profile is one row in `cp_profiles`.
+  - Writes go only through the `cp_save` RPC, which accepts only `art`/`guest` and never replaces a newer copy with an older one.
+  - Changes are sent after 2.5 s of quiet and when the app is hidden. On open, the newer of local and cloud wins.
+  - Schema: [`supabase/migrations/001_profiles.sql`](supabase/migrations/001_profiles.sql).
+- **Config:** set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` and in Vercel. Without them the app is local-only. Never put the secret key or DB password in the app.
 - **Settings → Export / Import JSON** to back up or move devices. **Reset** clears progress but keeps your colors.
 
 ## Tech
@@ -88,6 +95,8 @@ lib/music.ts         notes, chords, modes
 lib/state.ts         state shape + pure rules (unlocks, streak, week)
 lib/audio.ts         Tone.js playback + iOS unlock
 lib/pitch.ts         microphone pitch detection
+lib/cloud.ts         Supabase sync for the อาท / Guest profiles (fetch, no SDK)
+lib/storage.ts       per-profile localStorage
 i18n/th.ts           all UI strings
 public/sw.js         offline service worker
 ```

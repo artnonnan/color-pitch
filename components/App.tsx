@@ -23,6 +23,7 @@ import { Aurora } from "./fx/Aurora";
 import { colorOf } from "@/lib/colors";
 import { unlockedNotes } from "@/lib/state";
 import { Button, Card, cx } from "./ui";
+import { cloudEnabled, PROFILES, type ProfileId } from "@/lib/cloud";
 import { t } from "@/i18n";
 
 export type Screen =
@@ -53,7 +54,7 @@ export default function App() {
 }
 
 function Shell() {
-  const { ready, state, storageOk } = useStore();
+  const { ready, state, storageOk, profile } = useStore();
   const [screen, setScreen] = useState<Screen>("home");
   const [gateSkipped, setGateSkipped] = useState(false);
 
@@ -86,6 +87,7 @@ function Shell() {
   }, []);
   const home = useCallback(() => go("home"), [go]);
 
+  if (!profile) return <ProfilePicker />;
   if (!ready) {
     return <div className="flex min-h-dvh items-center justify-center text-ink-3">{t.appName}</div>;
   }
@@ -169,6 +171,52 @@ function Shell() {
       )}
     </main>
     </>
+  );
+}
+
+/** Shown every time the app opens: pick who is practicing. */
+function ProfilePicker() {
+  const { selectProfile, lastProfile } = useStore();
+  const [cloud, setCloud] = useState(false);
+  useEffect(() => setCloud(cloudEnabled()), []);
+  const look: Record<ProfileId, { emoji: string; bg: string }> = {
+    art: { emoji: "🎨", bg: "linear-gradient(135deg, #ef4444, #facc15 45%, #38bdf8 80%, #a855f7)" },
+    guest: { emoji: "👋", bg: "linear-gradient(135deg, #334155, #64748b)" },
+  };
+  return (
+    <main className="relative z-[1] mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-5 px-4 pb-10">
+      <div className="text-center">
+        <h1 className="bg-gradient-to-r from-[#ef4444] via-[#facc15] via-50% to-[#a855f7] bg-clip-text text-3xl font-black text-transparent">
+          {t.appName}
+        </h1>
+        <h2 className="mt-4 text-xl font-bold">{t.profile.title}</h2>
+        <p className="text-sm text-ink-3">{cloud ? t.profile.sub : t.profile.subLocal}</p>
+      </div>
+      {PROFILES.map((id, i) => (
+        <button
+          key={id}
+          data-testid={`profile-${id}`}
+          onClick={() => selectProfile(id)}
+          className="relative flex min-h-28 items-center gap-4 rounded-3xl p-5 text-left text-white shadow-lg active:scale-[0.98]"
+          style={{ background: look[id].bg }}
+        >
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/25 text-3xl">
+            {look[id].emoji}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-2xl font-black drop-shadow">
+              {i + 1}. {t.profile.names[id]}
+            </span>
+            <span className="block text-sm opacity-95 drop-shadow">{t.profile.desc[id]}</span>
+          </span>
+          {lastProfile === id && (
+            <span className="absolute right-3 top-3 rounded-full bg-black/30 px-2 py-0.5 text-xs font-bold">
+              {t.profile.last}
+            </span>
+          )}
+        </button>
+      ))}
+    </main>
   );
 }
 

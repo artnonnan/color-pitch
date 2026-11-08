@@ -12,7 +12,7 @@ import { t } from "@/i18n";
 const OCTAVE_CHOICES = [36, 48, 60, 72, 84]; // C2..C6
 
 export function SettingsScreen() {
-  const { state, setSettings, setProgress, replaceState } = useStore();
+  const { state, setSettings, setProgress, replaceState, profile, sync, switchProfile } = useStore();
   const s = state.settings;
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -230,6 +230,19 @@ export function SettingsScreen() {
             </button>
           ))}
         </div>
+      </Card>
+
+      {/* Profile */}
+      <Card className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm text-ink-3">{t.profile.current}</div>
+          <div className="font-bold">
+            {profile ? t.profile.names[profile] : ""} <span className="text-xs font-normal text-ink-3">· {t.profile.sync[sync]}</span>
+          </div>
+        </div>
+        <Button variant="secondary" onClick={switchProfile} data-testid="switch-profile">
+          ⇄ {t.profile.switch}
+        </Button>
       </Card>
 
       {/* Data */}

@@ -4,10 +4,13 @@
 //
 // usage: node scripts/drive.cjs <recipe.js | doctor> [--url http://localhost:3123]
 //                               [--out verification/<date>-<name>] [--mic c4 | deny | none]
+//                               [--profile guest | art | none] [--cloud]
 //
 // The recipe is the body of an async function with these in scope:
 //   page, sleep(ms), log(key, value), out
-//   go(hash)          open "#quiz", "#degrees"… (or "" for home) and wait for it to settle
+//   go(hash)          open "#quiz", "#degrees"… (or "" for home), pick the --profile on the
+//                     profile picker (default guest; "none" leaves the picker up), wait to settle
+//   pickProfile(id)   tap "art" or "guest" on the profile picker
 //   tap(regex)        tap the first enabled <button> whose text matches
 //   tapSel(css)       tap the element matching a CSS selector
 //   tapKey(pc)        tap keyboard key for pitch class 0–11
@@ -21,6 +24,8 @@
 // Whatever the recipe returns is printed as JSON. Page errors make the exit code 1.
 //
 // Every run uses a fresh browser profile, so localStorage starts empty (a new player).
+// Cloud sync is switched off (localStorage "color-pitch:nocloud") so runs never touch the
+// real อาท/guest rows. Pass --cloud only for a deliberate sync check.
 const fs = require("fs"), path = require("path"), net = require("net"), { spawn } = require("child_process");
 const puppeteer = require(process.env.PUPPETEER_CORE || "D:/Engine/featuremap/harness/web/node_modules/puppeteer-core");
 
@@ -32,6 +37,8 @@ const URL = opt("--url", "http://localhost:3123").replace(/\/$/, "");
 const name = recipe === "doctor" ? "doctor" : path.basename(recipe, ".js");
 const out = path.resolve(opt("--out", path.join(__dirname, "..", "verification", `${new Date().toISOString().slice(0, 10)}-${name}`)));
 const mic = opt("--mic", "c4");
+const pick = opt("--profile", "guest");
+const cloud = argv.includes("--cloud");
 const EDGE = process.env.EDGE_PATH || "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
 
 /** 3 s of C4 (261.63 Hz) as 48 kHz mono 16-bit WAV, for the fake microphone. */
@@ -81,10 +88,18 @@ function writeC4(file) {
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+    if (!cloud) await page.evaluateOnNewDocument(() => { try { localStorage.setItem("color-pitch:nocloud", "1"); } catch {} });
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const pickProfile = async (id) => {
+      await page.waitForSelector(`[data-testid="profile-${id}"]`, { timeout: 10000 });
+      await (await page.$(`[data-testid="profile-${id}"]`)).tap();
+      await page.waitForFunction(() => window.__cpSync && window.__cpSync().profile, { timeout: 10000 });
+      await sleep(300);
+    };
     const go = async (hash) => {
       await page.goto(`${URL}/${hash ? (hash.startsWith("#") ? hash : "#" + hash) : ""}`, { waitUntil: "networkidle0" });
       await page.waitForFunction(() => typeof window.__colorPitch === "function", { timeout: 15000 });
+      if (pick !== "none" && !(await page.evaluate(() => window.__cpSync && window.__cpSync().profile))) await pickProfile(pick);
       await sleep(400);
     };
     const tap = async (re) => {
@@ -132,7 +147,7 @@ function writeC4(file) {
       if (!(result.status === 200 && result.buildIdServed && result.hooks.state === "function" && result.hooks.audio === "function")) code = 1;
     } else {
       const body = fs.readFileSync(recipe, "utf8");
-      const ctx = { page, sleep, log, out, go, tap, tapSel, tapKey, skipGate, state, question, audio, text, waitFor, shot, save };
+      const ctx = { page, sleep, log, out, go, pickProfile, tap, tapSel, tapKey, skipGate, state, question, audio, text, waitFor, shot, save };
       result = await new Function(...Object.keys(ctx), `return (async () => { ${body} })();`)(...Object.values(ctx));
     }
     save("run-log", { recipe, url: URL, mic, lines, pageErrors: errors, result });

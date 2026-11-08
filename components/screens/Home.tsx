@@ -10,7 +10,7 @@ import type { Screen } from "../App";
 export const SESSION_STEPS: SessionStep[] = ["first", "quiz", "chords"];
 
 export function Home({ go, startSession }: { go: (s: Screen) => void; startSession: () => void }) {
-  const { state, setSettings } = useStore();
+  const { state, setSettings, profile, sync, switchProfile } = useStore();
   const { progress, settings } = state;
   const today = dayKey();
   const done = progress.sessionDone[today] ?? [];
@@ -39,6 +39,21 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
             {t.appName}
           </h1>
           <p className="text-sm text-ink-3">{t.tagline}</p>
+          <button
+            onClick={switchProfile}
+            data-testid="profile-chip"
+            className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-xs"
+          >
+            <span className="font-bold">{profile ? t.profile.names[profile] : ""}</span>
+            <span className="text-ink-3">·</span>
+            <span
+              className={cx(
+                "h-2 w-2 rounded-full",
+                sync === "synced" ? "bg-good" : sync === "offline" ? "bg-bad" : sync === "syncing" ? "animate-pulse bg-accent" : "bg-ink-3",
+              )}
+            />
+            <span className="text-ink-3" data-testid="sync-status">{t.profile.sync[sync]}</span>
+          </button>
         </div>
         <button
           aria-label={t.settings.theme}

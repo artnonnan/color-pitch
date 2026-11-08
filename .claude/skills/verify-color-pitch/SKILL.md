@@ -40,6 +40,7 @@ Run it before the first drive and again after anything surprising.
 `node scripts/drive.cjs <recipe.js> [--url http://localhost:3123] [--out <dir>] [--mic c4|deny|none]`
 
 - **Fresh player every run.** Each run opens headless Edge on a new browser profile, so localStorage is empty. That means notes C and G, 2 chords, 3 degrees, 3 intervals and 3 progression chords (I, IV, V) are unlocked, and melodies are 3 notes long.
+- **Profile picker and cloud.** The app opens on a profile picker. The driver taps **guest** after every page load (`--profile guest|art|none`). It also sets localStorage `color-pitch:nocloud` so runs never touch the real Supabase rows. `--cloud` turns sync on for a deliberate sync check. `window.__cpSync()` reads profile and sync status.
 - **Phone setup.** The viewport is a 375×812 iPhone with touch, and every tap is a real touch tap.
 - **Fake microphone.** `--mic c4` (the default) feeds a steady C4 into the mic. `deny` refuses mic permission. `none` adds no fake device.
 - **Recipe helpers.** These are documented in the header of `scripts/drive.cjs`:
@@ -63,6 +64,8 @@ Existing recipes:
 | `recipes/voices.js` | [mix-voices](features/mix-voices.md) |
 | `recipes/progressions.js` | [progressions](features/progressions.md) |
 | `recipes/melody.js` | [melody](features/melody.md) |
+| `recipes/profiles.js` (`--profile none`) | [profiles](features/profiles.md) |
+| `recipes/sync-write.js` then `sync-read.js` (`--cloud --profile none`, writes the real guest row) | [profiles](features/profiles.md) |
 
 Older single-purpose scripts are still in `scripts/`. Each needs the server on port 3123 and a `c4.wav` next to it:
 - `verify-edge.cjs`: daily session, mic, offline, denied mic

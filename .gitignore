@@ -6,3 +6,6 @@ out
 next-env.d.ts
 verification/
 .env*
+
+# local secrets
+config.txt
