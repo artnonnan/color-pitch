@@ -39,7 +39,7 @@ Run it before the first drive and again after anything surprising.
 
 `node scripts/drive.cjs <recipe.js> [--url http://localhost:3123] [--out <dir>] [--mic c4|deny|none]`
 
-- **Fresh player every run.** Each run opens headless Edge on a new browser profile, so localStorage is empty. That means notes C and G, 2 chords, 3 degrees and 3 intervals are unlocked.
+- **Fresh player every run.** Each run opens headless Edge on a new browser profile, so localStorage is empty. That means notes C and G, 2 chords, 3 degrees, 3 intervals and 3 progression chords (I, IV, V) are unlocked, and melodies are 3 notes long.
 - **Phone setup.** The viewport is a 375×812 iPhone with touch, and every tap is a real touch tap.
 - **Fake microphone.** `--mic c4` (the default) feeds a steady C4 into the mic. `deny` refuses mic permission. `none` adds no fake device.
 - **Recipe helpers.** These are documented in the header of `scripts/drive.cjs`:
@@ -61,6 +61,8 @@ Existing recipes:
 | `recipes/degrees.js` | [scale-degrees](features/scale-degrees.md) |
 | `recipes/intervals.js` | [intervals](features/intervals.md) |
 | `recipes/voices.js` | [mix-voices](features/mix-voices.md) |
+| `recipes/progressions.js` | [progressions](features/progressions.md) |
+| `recipes/melody.js` | [melody](features/melody.md) |
 
 Older single-purpose scripts are still in `scripts/`. Each needs the server on port 3123 and a `c4.wav` next to it:
 - `verify-edge.cjs`: daily session, mic, offline, denied mic

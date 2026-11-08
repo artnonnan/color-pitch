@@ -376,6 +376,8 @@ export function Stats() {
           <Tile value={pctOf(p.roots.filter((x) => x.answer === x.target).length, p.roots.length)} label={t.stats.rootAcc} />
           <Tile value={pctOf(p.degrees.filter((x) => x.answer === x.target).length, p.degrees.length)} label={t.stats.degreeAcc} />
           <Tile value={pctOf(p.intervals.filter((x) => x.answer === x.target).length, p.intervals.length)} label={t.stats.intervalAcc} />
+          <Tile value={pctOf(p.progressions.filter((x) => x.answer === x.target).length, p.progressions.length)} label={t.stats.progressionAcc} />
+          <Tile value={pctOf(p.melodies.filter((x) => x.answer === x.target).length, p.melodies.length)} label={t.stats.melodyAcc} />
         </div>
       </Section>
 

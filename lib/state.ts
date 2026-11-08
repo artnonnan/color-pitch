@@ -9,7 +9,10 @@ import {
   INTERVALS,
   INITIAL_CHORDS,
   INITIAL_NOTES,
+  INITIAL_NUMERALS,
+  MELODY_LENGTHS,
   NOTE_UNLOCK_ORDER,
+  NUMERALS,
   midisOfPc,
   pickWeighted,
   randInt,
@@ -18,6 +21,7 @@ import {
   type Interval,
   type IntervalDir,
   type Mode,
+  type Numeral,
   type PC,
 } from "./music";
 
@@ -104,6 +108,24 @@ export interface IntervalAnswer {
   low: PC;
   ms: number;
 }
+/** One chord slot of a progression (the player names chords 2–4, one entry each). */
+export interface ProgressionChordAnswer {
+  t: number;
+  key: PC;
+  /** 1-based position in the progression (2–4; position 1 is always I). */
+  pos: number;
+  target: Numeral;
+  answer: Numeral;
+}
+/** One note slot of a dictated melody. */
+export interface MelodyNoteAnswer {
+  t: number;
+  /** Melody length this note belonged to. */
+  len: number;
+  pos: number;
+  target: PC;
+  answer: PC;
+}
 export interface RushRun {
   t: number;
   score: number;
@@ -135,6 +157,12 @@ export interface Progress {
   intervalsUnlocked: number; // count into INTERVALS
   intervalsSetSince: number;
   intervals: IntervalAnswer[];
+  numeralsUnlocked: number; // count into NUMERALS
+  numeralsSetSince: number;
+  progressions: ProgressionChordAnswer[];
+  melodyLevel: number; // index into MELODY_LENGTHS
+  melodySetSince: number;
+  melodies: MelodyNoteAnswer[];
 }
 
 export interface AppState {
@@ -198,6 +226,12 @@ export function defaultProgress(): Progress {
     intervalsUnlocked: INITIAL_INTERVALS,
     intervalsSetSince: 0,
     intervals: [],
+    numeralsUnlocked: INITIAL_NUMERALS,
+    numeralsSetSince: 0,
+    progressions: [],
+    melodyLevel: 0,
+    melodySetSince: 0,
+    melodies: [],
   };
 }
 export function defaultState(): AppState {
@@ -238,6 +272,8 @@ export function normalizeState(raw: unknown): AppState {
       rush: arr(p.rush, []),
       degrees: arr(p.degrees, []),
       intervals: arr(p.intervals, []),
+      progressions: arr(p.progressions, []),
+      melodies: arr(p.melodies, []),
     },
   };
 }
@@ -248,6 +284,9 @@ export const unlockedNotes = (p: Progress): PC[] => NOTE_UNLOCK_ORDER.slice(0, p
 export const unlockedChords = (p: Progress): ChordQuality[] => CHORD_QUALITIES.slice(0, p.chordsUnlocked);
 export const unlockedDegrees = (p: Progress): Degree[] => DEGREE_UNLOCK_ORDER.slice(0, p.degreesUnlocked);
 export const unlockedIntervals = (p: Progress): Interval[] => INTERVALS.slice(0, p.intervalsUnlocked);
+export const unlockedNumerals = (p: Progress): Numeral[] => NUMERALS.slice(0, p.numeralsUnlocked);
+export const melodyLength = (p: Progress): number =>
+  MELODY_LENGTHS[Math.min(Math.max(p.melodyLevel, 0), MELODY_LENGTHS.length - 1)];
 
 /** 1-based training week since first launch (guidance only). */
 export function currentWeek(p: Progress, today = dayKey()): number {
@@ -300,6 +339,11 @@ export const recentDegreeAccuracy = (p: Progress) =>
 export const recentIntervalAccuracy = (p: Progress) =>
   recent(p.intervals, p.intervalsSetSince, (a) => a.target === a.answer);
 
+export const recentProgressionAccuracy = (p: Progress) =>
+  recent(p.progressions, p.numeralsSetSince, (a) => a.target === a.answer);
+export const recentMelodyAccuracy = (p: Progress) =>
+  recent(p.melodies, p.melodySetSince, (a) => a.target === a.answer);
+
 const meetsUnlock = (r: RecentAccuracy) => r.n >= UNLOCK_WINDOW && r.correct / r.n >= UNLOCK_ACCURACY;
 
 // ---------- reducers (pure: return a new Progress) ----------
@@ -351,6 +395,39 @@ export function recordIntervalAnswer(
     return { progress: next, unlocked };
   }
   return { progress: next, unlocked: null };
+}
+/** Record every named chord of one progression; returns the newly unlocked chord, if any. */
+export function recordProgression(
+  p: Progress,
+  answers: ProgressionChordAnswer[],
+): { progress: Progress; unlocked: Numeral | null } {
+  let next: Progress = p;
+  let unlocked: Numeral | null = null;
+  for (const a of answers) {
+    next = { ...next, progressions: capped(next.progressions, a) };
+    if (!unlocked && next.numeralsUnlocked < NUMERALS.length && meetsUnlock(recentProgressionAccuracy(next))) {
+      unlocked = NUMERALS[next.numeralsUnlocked];
+      // The rest of this progression shares the timestamp, so it counts toward the old set.
+      next = { ...next, numeralsUnlocked: next.numeralsUnlocked + 1, numeralsSetSince: a.t + 1 };
+    }
+  }
+  return { progress: next, unlocked };
+}
+/** Record every note of one dictated melody; returns the new melody length if it grew. */
+export function recordMelody(
+  p: Progress,
+  answers: MelodyNoteAnswer[],
+): { progress: Progress; grewTo: number | null } {
+  let next: Progress = p;
+  let grewTo: number | null = null;
+  for (const a of answers) {
+    next = { ...next, melodies: capped(next.melodies, a) };
+    if (grewTo === null && next.melodyLevel < MELODY_LENGTHS.length - 1 && meetsUnlock(recentMelodyAccuracy(next))) {
+      next = { ...next, melodyLevel: next.melodyLevel + 1, melodySetSince: a.t + 1 };
+      grewTo = MELODY_LENGTHS[next.melodyLevel];
+    }
+  }
+  return { progress: next, grewTo };
 }
 export const rushBest = (p: Progress) => p.rush.reduce((m, r) => Math.max(m, r.score), 0);
 export const appendCapped = <T,>(arr: T[], item: T) => capped(arr, item);

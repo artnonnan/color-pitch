@@ -6,7 +6,8 @@ This folder is the maintained source for what a player can see and do in Color P
 
 - Launch the production server as described in `../SKILL.md`. `doctor` must pass with the right build id.
 - Each `drive.cjs` run uses a fresh browser profile, so the player is new.
-  - Unlocked: notes C and G, chords major and minor, scale degrees 1, 5 and 3, intervals P8, P5 and M3.
+  - Unlocked: notes C and G, chords major and minor, scale degrees 1, 5 and 3, intervals P8, P5 and M3, progression chords I, IV and V.
+  - Melody length is 3.
   - Interval direction is `up`, and the instrument is `piano`.
 - Never drive a server this verification run did not start.
 
@@ -32,6 +33,8 @@ Each feature file starts with an H1 title and one paragraph that describes what 
 - [Note + color quiz](./note-quiz.md) covers the core loop: hear a note, tap its colored key, and unlock notes by accuracy.
 - [Scale degrees](./scale-degrees.md) covers functional ear training: a cadence sets the key, then the player names the degree of one note.
 - [Intervals](./intervals.md) covers hearing two notes and naming the distance, in four directions, with unlocks.
+- [Chord progressions](./progressions.md) covers hearing four chords that start on I and naming chords 2–4 by function (I, IV, V, then vi, ii, iii).
+- [Melody](./melody.md) covers melodic dictation with absolute pitch: hearing a melody of unlocked notes and tapping it back, with melodies growing from 3 to 6 notes.
 - [Mix voices](./mix-voices.md) covers the "สลับเสียง" instrument setting, which changes timbre on every question.
 
 Not mapped yet. Each still has an older script in `scripts/` that needs porting to `drive.cjs`:

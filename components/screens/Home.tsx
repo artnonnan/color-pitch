@@ -242,6 +242,44 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
             </span>
           </button>
           <button
+            onClick={() => go("progressions")}
+            data-testid="card-progressions"
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="flex items-end gap-1">
+              {[1, 4, 5].map((d) => (
+                <span
+                  key={d}
+                  className="flex h-6 min-w-6 items-center justify-center rounded-lg px-1 font-serif text-xs font-black text-white"
+                  style={{ background: DEGREE_COLORS[d] }}
+                >
+                  {d === 1 ? "I" : d === 4 ? "IV" : "V"}
+                </span>
+              ))}
+              <span className="ml-1 text-xl">🛤️</span>
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.progressions.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.progressions.desc}</span>
+            </span>
+          </button>
+          <button
+            onClick={() => go("melody")}
+            data-testid="card-melody"
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="flex items-end gap-1">
+              {noteCols.slice(0, 3).map((c, i) => (
+                <span key={c} className="w-3 rounded-full" style={{ height: [14, 22, 18][i], background: c, boxShadow: `0 0 10px ${c}` }} />
+              ))}
+              <span className="ml-1 text-xl">🎼</span>
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.melody.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.melody.desc}</span>
+            </span>
+          </button>
+          <button
             onClick={() => go("modes")}
             className="flex min-h-28 flex-col justify-between rounded-3xl p-4 text-left active:scale-[0.98]"
             style={{ background: "linear-gradient(135deg, #fff3c4, #f5a65b 35%, #6b4c8a 70%, #12111f)", color: "#fff" }}

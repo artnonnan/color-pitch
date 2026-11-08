@@ -152,3 +152,64 @@ export const INTERVAL_SEMITONES: Record<Interval, number> = {
 };
 export const INITIAL_INTERVALS = 3;
 export type IntervalDir = "up" | "down" | "together" | "mix";
+
+// ---------- chord progressions ----------
+
+/** Diatonic triads of a major key. Unlock order: the three primary chords, then vi, ii, iii. */
+export const NUMERALS = ["I", "IV", "V", "vi", "ii", "iii"] as const;
+export type Numeral = (typeof NUMERALS)[number];
+export const NUMERAL_DEGREE: Record<Numeral, Degree> = { I: 1, ii: 2, iii: 3, IV: 4, V: 5, vi: 6 };
+export const NUMERAL_QUALITY: Record<Numeral, ChordQuality> = {
+  I: "major", IV: "major", V: "major", vi: "minor", ii: "minor", iii: "minor",
+};
+export const INITIAL_NUMERALS = 3;
+/** Chords per progression. The first is always I, so the player names the rest. */
+export const PROGRESSION_LEN = 4;
+
+/**
+ * A diatonic triad in a major key: a bass root plus close upper voices kept in one
+ * window above the tonic, so the chords move smoothly. `tonic` should sit in C3–B3.
+ */
+export function diatonicTriad(tonic: number, n: Numeral): number[] {
+  const i = NUMERAL_DEGREE[n] - 1;
+  const lo = tonic + 4;
+  const upper = [0, 2, 4].map((k) => {
+    let m = tonic + MAJOR_STEPS[(i + k) % 7];
+    while (m < lo) m += 12;
+    while (m >= lo + 12) m -= 12;
+    return m;
+  });
+  return [tonic - 12 + MAJOR_STEPS[i], ...upper.sort((a, b) => a - b)];
+}
+
+/** I followed by random chords from `set`, never the same chord twice in a row. */
+export function randomProgression(set: readonly Numeral[]): Numeral[] {
+  const out: Numeral[] = ["I"];
+  while (out.length < PROGRESSION_LEN) {
+    const prev = out[out.length - 1];
+    const options = set.filter((x) => x !== prev);
+    out.push(pick(options.length ? options : set));
+  }
+  return out;
+}
+
+// ---------- melodic dictation ----------
+
+/** Melody length levels: start with 3 notes, grow one at a time on the unlock rule. */
+export const MELODY_LENGTHS = [3, 4, 5, 6] as const;
+
+/**
+ * A short melody from `pcs`, played in C4–B4. No pitch class appears three times
+ * in a row, and with two or more notes the melody is never a single repeated note.
+ */
+export function randomMelody(pcs: readonly PC[], len: number): number[] {
+  const out: PC[] = [];
+  while (out.length < len) {
+    let pc = pick(pcs);
+    const n = out.length;
+    if (n >= 2 && out[n - 1] === pc && out[n - 2] === pc && pcs.length > 1) pc = pick(pcs.filter((x) => x !== pc));
+    out.push(pc);
+  }
+  if (pcs.length > 1 && out.every((x) => x === out[0])) out[out.length - 1] = pick(pcs.filter((x) => x !== out[0]));
+  return out.map((pc) => 60 + pc);
+}

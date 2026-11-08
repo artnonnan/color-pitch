@@ -52,6 +52,8 @@ Daily session (~10–15 min), started with one button:
 | 8 | **Chord Root** | Hear a chord and tap its root note. This is absolute pitch inside harmony. |
 | 9 | **Scale Degrees** | A I–IV–V–I cadence sets a random major key, then one note plays. Tap its degree (1–7, with solfège and a feeling word). Feedback names the real note in its own color, then the note walks home to 1 (2–5 down, 6–7 up). Degrees unlock 1, 5, 3 → 2, 4, 6, 7 by the same 90 %/30 rule. This is "functional ear training": relative hearing, linked back to absolute colors. |
 | 10 | **Intervals** | Hear two notes (up, down, together, or mixed) and name the distance. The feedback blends the two notes' colors. Unlock order: P8, P5, M3, then P4, m3, M2, m2, M6, m6, M7, m7, tritone. |
+| 11 | **Chord Progressions** | Hear four chords in a random major key. The first is always I. Tap the function of chords 2–4 (I, IV, V first, then vi, ii, iii by the 90 %/30 rule). Feedback reveals each chord's name in the key, its major/minor mood, and its root note's color, then replays the progression. Common practice in ear-training courses: start with the three primary chords, then add vi. |
+| 12 | **Melody** | Melodic dictation with absolute pitch. Hear a short melody made only of your unlocked notes, then tap it back on the colored keyboard. Nothing plays while you answer, so each note is named from memory, not by its distance from the note before. Melodies start at 3 notes and grow to 6 by the 90 %/30 rule (each note counts). |
 | 5 | **Pocket tuner** | Hear a sound in daily life: tap your guess, then measure. Shows the real note and its color, and logs your accuracy. |
 
 **Visual feedback:** particle bursts in the note's color on correct answers, a combo counter (its color is fixed so it never gives away the answer), a full-screen ceremony when a note unlocks, a slowly drifting aurora in your unlocked colors, and fireworks for new high scores and finished sessions. All of it respects "reduce motion".
@@ -80,7 +82,7 @@ Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Tone.js `Sampler` wit
 ```
 app/                 layout, page, global styles
 components/App.tsx   screens, hash navigation, first-note gate, session runner
-components/exercises FirstNote, Quiz, Chords, Modes, Tuner
+components/exercises FirstNote, Quiz, Chords, Modes, Tuner, Rush, Sing, Roots, Degrees, Intervals, Progressions, Melody
 components/screens   Home, Stats, Settings
 lib/music.ts         notes, chords, modes
 lib/state.ts         state shape + pure rules (unlocks, streak, week)
