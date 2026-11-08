@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
 import { colorOf } from "@/lib/colors";
 import { nameOf, type PC } from "@/lib/music";
-import { playNote, stopAll } from "@/lib/audio";
+import { playNote, stopAll, newVoice } from "@/lib/audio";
 import { appendCapped, pickNoteMidi, recordNoteAnswer, rushBest, unlockedNotes } from "@/lib/state";
 import { Keyboard, type KeyFlash } from "../Keyboard";
 import { Button, Card, ScreenHeader, cx } from "../ui";
@@ -52,6 +52,7 @@ export function Rush({ onBack }: { onBack: () => void }) {
     if (Date.now() - startAt.current >= ROUND_MS) return;
     const next = pickNoteMidi(getState(), last.current);
     last.current = next.pc;
+    newVoice();
     (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "note", ...next };
     setQ(next);
     setFlashes([]);

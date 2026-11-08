@@ -1,0 +1,256 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { useStore, usePracticeTimer } from "@/lib/store";
+import { colorOf, mix } from "@/lib/colors";
+import {
+  INTERVAL_SEMITONES,
+  INTERVALS,
+  nameOf,
+  pcOf,
+  pick,
+  randInt,
+  type Interval,
+  type IntervalDir,
+} from "@/lib/music";
+import { newVoice, playChord, playSequence, stopAll } from "@/lib/audio";
+import { recentIntervalAccuracy, recordIntervalAnswer, unlockedIntervals, unlockedNotes, UNLOCK_WINDOW } from "@/lib/state";
+import { Button, Card, ColorWash, NoteDot, ProgressBar, ScreenHeader, cx } from "../ui";
+import { burstFrom, fireworks } from "../fx/Burst";
+import { ComboBadge } from "../fx/Celebration";
+import { t } from "@/i18n";
+
+const ROUNDS = 10;
+const DIRS: IntervalDir[] = ["up", "down", "together", "mix"];
+/** Answer buttons in size order, so the grid reads like a ruler. */
+const BY_SIZE = [...INTERVALS].sort((a, b) => INTERVAL_SEMITONES[a] - INTERVAL_SEMITONES[b]);
+type Phase = "intro" | "question" | "feedback" | "summary";
+interface Q {
+  iv: Interval;
+  dir: Exclude<IntervalDir, "mix">;
+  low: number;
+  high: number;
+}
+
+function play(q: Q) {
+  if (q.dir === "together") return playChord([q.low, q.high], 1.6);
+  return playSequence(q.dir === "up" ? [q.low, q.high] : [q.high, q.low], 0.75, 0.9);
+}
+
+/** Hear two notes, name the distance. The two colors blend in the feedback. */
+export function Intervals({ onBack }: { onBack: () => void }) {
+  const { state, setProgress, setSettings, getState } = useStore();
+  const { settings, progress } = state;
+  usePracticeTimer(true);
+
+  const [phase, setPhase] = useState<Phase>("intro");
+  const [q, setQ] = useState<Q | null>(null);
+  const [round, setRound] = useState(0);
+  const [hits, setHits] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [verdict, setVerdict] = useState<{ ok: boolean; answer: Interval; unlocked: Interval | null } | null>(null);
+  const [wash, setWash] = useState<{ color: string; k: number } | null>(null);
+  const k = useRef(0);
+  const timer = useRef<number | null>(null);
+  const roundRef = useRef(0);
+  const hitsRef = useRef(0);
+  const askedAt = useRef(0);
+  const last = useRef<Interval | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current);
+      stopAll();
+    },
+    [],
+  );
+
+  const ask = () => {
+    newVoice();
+    const s = getState();
+    const set = unlockedIntervals(s.progress);
+    let iv = pick(set);
+    if (iv === last.current && set.length > 1) iv = pick(set.filter((x) => x !== iv));
+    last.current = iv;
+    const semis = INTERVAL_SEMITONES[iv];
+    const want = s.settings.intervalDir;
+    const dir = want === "mix" ? pick(["up", "down", "together"] as const) : want;
+    const lo = s.settings.lowMidi;
+    const low = randInt(lo, Math.max(lo, s.settings.highMidi - semis));
+    const x: Q = { iv, dir, low, high: low + semis };
+    (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "interval", ...x, semis };
+    setQ(x);
+    setVerdict(null);
+    roundRef.current++;
+    setRound(roundRef.current);
+    setPhase("question");
+    void play(x);
+    askedAt.current = performance.now();
+  };
+
+  const answer = (a: Interval) => {
+    if (phase !== "question" || !q) return;
+    const ok = a === q.iv;
+    const ms = Math.round(performance.now() - askedAt.current);
+    let unlocked: Interval | null = null;
+    setProgress((p) => {
+      const r = recordIntervalAnswer(p, { t: Date.now(), target: q.iv, answer: a, dir: q.dir, low: pcOf(q.low), ms });
+      unlocked = r.unlocked;
+      return r.progress;
+    });
+    const u = unlocked as Interval | null;
+    const cLow = colorOf(settings.noteColors, q.low);
+    const cHigh = colorOf(settings.noteColors, q.high);
+    k.current++;
+    setVerdict({ ok, answer: a, unlocked: u });
+    setPhase("feedback");
+    setWash({ color: mix(cLow, cHigh), k: k.current });
+    if (ok) {
+      hitsRef.current++;
+      setHits(hitsRef.current);
+      setCombo((c) => c + 1);
+      burstFrom(document.querySelector(`button[data-interval="${a}"]`), [cLow, cHigh], 1.1 + combo / 4);
+      timer.current = window.setTimeout(next, 1500);
+    } else {
+      setCombo(0);
+      void play(q);
+      timer.current = window.setTimeout(next, 3200);
+    }
+    if (u) window.setTimeout(() => fireworks([cLow, cHigh, "#ffffff"], 6), 200);
+  };
+
+  function next() {
+    if (timer.current) window.clearTimeout(timer.current);
+    if (roundRef.current >= ROUNDS) {
+      setPhase("summary");
+      if (hitsRef.current >= ROUNDS * 0.8) {
+        fireworks(unlockedNotes(getState().progress).map((pc) => colorOf(settings.noteColors, pc)), 6);
+      }
+      return;
+    }
+    ask();
+  }
+
+  const unlockedSet = unlockedIntervals(progress);
+  const acc = recentIntervalAccuracy(progress);
+  const allUnlocked = progress.intervalsUnlocked >= INTERVALS.length;
+  const name = (iv: Interval) => t.intervals.names[iv];
+  const first = q ? (q.dir === "down" ? q.high : q.low) : 0;
+  const second = q ? (q.dir === "down" ? q.low : q.high) : 0;
+
+  return (
+    <div className="flex min-h-[calc(100dvh-1rem)] flex-col">
+      <ScreenHeader
+        title={t.exercises.intervals.title}
+        onBack={onBack}
+        sub={phase === "intro" ? undefined : t.intervals.round(Math.min(Math.max(round, 1), ROUNDS), ROUNDS)}
+      />
+      {wash && <ColorWash color={wash.color} k={wash.k} />}
+      <div className="relative z-[11] flex flex-1 flex-col gap-4">
+        <Card className="space-y-2">
+          <div className="text-sm text-ink-2">{acc.n ? t.quiz.accuracyRecent(acc.pct, acc.n) : t.quiz.unlockNeed}</div>
+          {!allUnlocked && <ProgressBar value={acc.n >= UNLOCK_WINDOW ? acc.pct / 100 / 0.9 : acc.n / UNLOCK_WINDOW} />}
+        </Card>
+
+        <div className="flex min-h-40 flex-1 flex-col items-center justify-center gap-3 text-center">
+          {phase === "intro" && (
+            <>
+              <div className="text-6xl">📏</div>
+              <p className="text-ink-2">{t.exercises.intervals.desc}</p>
+              <div className="w-full space-y-2">
+                <div className="text-sm font-semibold text-ink-2">{t.intervals.dir}</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {DIRS.map((d) => (
+                    <button
+                      key={d}
+                      data-dir={d}
+                      onClick={() => setSettings((x) => ({ ...x, intervalDir: d }))}
+                      className={cx(
+                        "min-h-12 rounded-2xl border text-sm font-semibold",
+                        settings.intervalDir === d ? "border-accent bg-accent/15 text-ink" : "border-line bg-surface-2 text-ink-3",
+                      )}
+                    >
+                      {t.intervals.dirs[d]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button big onClick={ask} className="pulse-ring" data-testid="intervals-start">
+                ▶ {t.start}
+              </Button>
+            </>
+          )}
+          {phase === "question" && q && (
+            <>
+              <div className="h-9">
+                <ComboBadge combo={combo} />
+              </div>
+              <p className="text-lg text-ink-2">{t.intervals.listen}</p>
+              <p className="text-xs text-ink-3">{t.intervals.dirs[q.dir]}</p>
+              <Button variant="secondary" onClick={() => void play(q)}>
+                ↻ {t.replay}
+              </Button>
+            </>
+          )}
+          {phase === "feedback" && q && verdict && (
+            <button className="space-y-2" onClick={next} data-testid="intervals-feedback">
+              <div className={cx("pop text-3xl font-black", verdict.ok ? "text-good" : "text-bad")}>
+                {verdict.unlocked
+                  ? `🔓 ${t.intervals.unlocked(name(verdict.unlocked))}`
+                  : verdict.ok
+                    ? t.intervals.correct
+                    : t.intervals.wrong(name(q.iv))}
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <NoteDot color={colorOf(settings.noteColors, first)} label={nameOf(first)} size={34} />
+                <span className="text-xl text-ink-3">{q.dir === "together" ? "+" : "→"}</span>
+                <NoteDot color={colorOf(settings.noteColors, second)} label={nameOf(second)} size={34} />
+              </div>
+              <div className="text-sm text-ink-3">
+                {t.intervals.notes(nameOf(first), nameOf(second), INTERVAL_SEMITONES[q.iv], q.dir === "together")}
+              </div>
+              <div className="text-xs text-ink-3">{t.next} ›</div>
+            </button>
+          )}
+          {phase === "summary" && (
+            <div className="w-full space-y-4">
+              <div className="text-6xl">{hits >= ROUNDS * 0.8 ? "🏆" : "🎶"}</div>
+              <h2 className="text-2xl font-black">{t.quiz.summaryLine(hits, ROUNDS)}</h2>
+              <Button big className="w-full" onClick={onBack}>
+                {t.done}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {(phase === "question" || phase === "feedback") && (
+          <div className="grid grid-cols-3 gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {BY_SIZE.map((iv) => {
+              const on = unlockedSet.includes(iv);
+              const isTarget = phase === "feedback" && q?.iv === iv;
+              const isWrong = phase === "feedback" && verdict && !verdict.ok && verdict.answer === iv;
+              return (
+                <button
+                  key={iv}
+                  data-interval={iv}
+                  disabled={!on || phase !== "question"}
+                  onClick={() => answer(iv)}
+                  className={cx(
+                    "flex min-h-16 flex-col items-center justify-center rounded-2xl border px-1 py-2 transition active:scale-95",
+                    on ? "border-line bg-surface text-ink" : "border-transparent bg-surface-2 text-ink-3 opacity-40",
+                    isTarget && "keyflash border-good ring-4 ring-good",
+                    isWrong && "shake ring-4 ring-bad",
+                  )}
+                >
+                  <span className="text-sm font-bold leading-tight">{on ? name(iv) : "🔒"}</span>
+                  <span className="text-[11px] text-ink-3">
+                    {iv} · {INTERVAL_SEMITONES[iv]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

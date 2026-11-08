@@ -2,7 +2,11 @@
 import { defaultChordMoods, defaultNoteColors, type ChordMoods, type NoteColors } from "./colors";
 import {
   CHORD_QUALITIES,
+  DEGREE_UNLOCK_ORDER,
   FIRST_NOTE_ROTATION,
+  INITIAL_DEGREES,
+  INITIAL_INTERVALS,
+  INTERVALS,
   INITIAL_CHORDS,
   INITIAL_NOTES,
   NOTE_UNLOCK_ORDER,
@@ -10,6 +14,9 @@ import {
   pickWeighted,
   randInt,
   type ChordQuality,
+  type Degree,
+  type Interval,
+  type IntervalDir,
   type Mode,
   type PC,
 } from "./music";
@@ -19,7 +26,8 @@ export const UNLOCK_WINDOW = 30;
 export const UNLOCK_ACCURACY = 0.9;
 const MAX_LOG = 6000;
 
-export type Instrument = "piano" | "sine";
+/** "mix" changes the voice every question, so pitch is learned apart from timbre. */
+export type Instrument = "piano" | "sine" | "mix";
 export type Theme = "dark" | "light";
 
 export interface Settings {
@@ -31,6 +39,8 @@ export interface Settings {
   highMidi: number;
   theme: Theme;
   hardMode: boolean;
+  /** Direction of the two notes in the interval exercise. */
+  intervalDir: IntervalDir;
 }
 
 export interface NoteAnswer {
@@ -77,6 +87,23 @@ export interface RootAnswer {
   answer: PC;
   quality: ChordQuality;
 }
+export interface DegreeAnswer {
+  t: number;
+  /** Tonic pitch class of the key the cadence set up. */
+  key: PC;
+  target: Degree;
+  answer: Degree;
+  ms: number;
+}
+export interface IntervalAnswer {
+  t: number;
+  target: Interval;
+  answer: Interval;
+  dir: Exclude<IntervalDir, "mix">;
+  /** Lower note's pitch class. */
+  low: PC;
+  ms: number;
+}
 export interface RushRun {
   t: number;
   score: number;
@@ -102,6 +129,12 @@ export interface Progress {
   sing: SingEntry[];
   roots: RootAnswer[];
   rush: RushRun[];
+  degreesUnlocked: number; // count into DEGREE_UNLOCK_ORDER
+  degreesSetSince: number;
+  degrees: DegreeAnswer[];
+  intervalsUnlocked: number; // count into INTERVALS
+  intervalsSetSince: number;
+  intervals: IntervalAnswer[];
 }
 
 export interface AppState {
@@ -139,6 +172,7 @@ export function defaultSettings(): Settings {
     highMidi: 72, // C5
     theme: "dark",
     hardMode: false,
+    intervalDir: "up",
   };
 }
 export function defaultProgress(): Progress {
@@ -158,6 +192,12 @@ export function defaultProgress(): Progress {
     sing: [],
     roots: [],
     rush: [],
+    degreesUnlocked: INITIAL_DEGREES,
+    degreesSetSince: 0,
+    degrees: [],
+    intervalsUnlocked: INITIAL_INTERVALS,
+    intervalsSetSince: 0,
+    intervals: [],
   };
 }
 export function defaultState(): AppState {
@@ -196,6 +236,8 @@ export function normalizeState(raw: unknown): AppState {
       sing: arr(p.sing, []),
       roots: arr(p.roots, []),
       rush: arr(p.rush, []),
+      degrees: arr(p.degrees, []),
+      intervals: arr(p.intervals, []),
     },
   };
 }
@@ -204,6 +246,8 @@ export function normalizeState(raw: unknown): AppState {
 
 export const unlockedNotes = (p: Progress): PC[] => NOTE_UNLOCK_ORDER.slice(0, p.notesUnlocked);
 export const unlockedChords = (p: Progress): ChordQuality[] => CHORD_QUALITIES.slice(0, p.chordsUnlocked);
+export const unlockedDegrees = (p: Progress): Degree[] => DEGREE_UNLOCK_ORDER.slice(0, p.degreesUnlocked);
+export const unlockedIntervals = (p: Progress): Interval[] => INTERVALS.slice(0, p.intervalsUnlocked);
 
 /** 1-based training week since first launch (guidance only). */
 export function currentWeek(p: Progress, today = dayKey()): number {
@@ -251,6 +295,11 @@ export const recentNoteAccuracy = (p: Progress) =>
 export const recentChordAccuracy = (p: Progress) =>
   recent(p.chordAnswers, p.chordsSetSince, (a) => a.target === a.answer);
 
+export const recentDegreeAccuracy = (p: Progress) =>
+  recent(p.degrees, p.degreesSetSince, (a) => a.target === a.answer);
+export const recentIntervalAccuracy = (p: Progress) =>
+  recent(p.intervals, p.intervalsSetSince, (a) => a.target === a.answer);
+
 const meetsUnlock = (r: RecentAccuracy) => r.n >= UNLOCK_WINDOW && r.correct / r.n >= UNLOCK_ACCURACY;
 
 // ---------- reducers (pure: return a new Progress) ----------
@@ -278,6 +327,27 @@ export function recordChordAnswer(
   if (next.chordsUnlocked < CHORD_QUALITIES.length && meetsUnlock(recentChordAccuracy(next))) {
     const unlocked = CHORD_QUALITIES[next.chordsUnlocked];
     next = { ...next, chordsUnlocked: next.chordsUnlocked + 1, chordsSetSince: a.t + 1 };
+    return { progress: next, unlocked };
+  }
+  return { progress: next, unlocked: null };
+}
+export function recordDegreeAnswer(p: Progress, a: DegreeAnswer): { progress: Progress; unlocked: Degree | null } {
+  let next: Progress = { ...p, degrees: capped(p.degrees, a) };
+  if (next.degreesUnlocked < DEGREE_UNLOCK_ORDER.length && meetsUnlock(recentDegreeAccuracy(next))) {
+    const unlocked = DEGREE_UNLOCK_ORDER[next.degreesUnlocked];
+    next = { ...next, degreesUnlocked: next.degreesUnlocked + 1, degreesSetSince: a.t + 1 };
+    return { progress: next, unlocked };
+  }
+  return { progress: next, unlocked: null };
+}
+export function recordIntervalAnswer(
+  p: Progress,
+  a: IntervalAnswer,
+): { progress: Progress; unlocked: Interval | null } {
+  let next: Progress = { ...p, intervals: capped(p.intervals, a) };
+  if (next.intervalsUnlocked < INTERVALS.length && meetsUnlock(recentIntervalAccuracy(next))) {
+    const unlocked = INTERVALS[next.intervalsUnlocked];
+    next = { ...next, intervalsUnlocked: next.intervalsUnlocked + 1, intervalsSetSince: a.t + 1 };
     return { progress: next, unlocked };
   }
   return { progress: next, unlocked: null };

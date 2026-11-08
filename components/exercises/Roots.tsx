@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
 import { colorOf } from "@/lib/colors";
 import { CHORD_INTERVALS, CHORD_SYMBOL, midisOfPc, nameOf, pick, type ChordQuality, type PC } from "@/lib/music";
-import { playChord, playNote, stopAll, wait } from "@/lib/audio";
+import { playChord, playNote, stopAll, wait, newVoice } from "@/lib/audio";
 import { appendCapped, unlockedChords, unlockedNotes } from "@/lib/state";
 import { Keyboard, type KeyFlash } from "../Keyboard";
 import { Button, ColorWash, ScreenHeader, cx } from "../ui";
@@ -48,6 +48,7 @@ export function Roots({ onBack }: { onBack: () => void }) {
     const options = midisOfPc(root, 48, 60); // roots C3–B3: chords stay in a clear register
     const base = options.length ? pick(options) : 48 + root;
     const midis = CHORD_INTERVALS[quality].map((i) => base + i);
+    newVoice();
     (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "root", pc: root, quality, midis };
     setQ({ root, quality, midis });
     setFlashes([]);

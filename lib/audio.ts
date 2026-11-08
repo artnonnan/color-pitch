@@ -1,5 +1,7 @@
 "use client";
-// Audio playback: Tone.js Sampler with Salamander Grand Piano samples, or a sine synth.
+// Audio playback: Tone.js Sampler with Salamander Grand Piano samples, or synth voices.
+// "mix" mode switches voice on every new question (`newVoice()`), because training
+// with several timbres helps pitch generalize beyond one instrument's sound.
 //
 // iOS rules this file follows:
 //  - The AudioContext may only start inside a user gesture, so `unlockAudio()` is
@@ -12,7 +14,9 @@
 import { midiToFreq } from "./music";
 
 type ToneModule = typeof import("tone");
-type Instrument = "piano" | "sine";
+type Instrument = "piano" | "sine" | "mix";
+export type Voice = "piano" | "sine" | "soft" | "bell" | "strings";
+export const VOICES: Voice[] = ["piano", "sine", "soft", "bell", "strings"];
 export type AudioStatus = "locked" | "loading" | "ready" | "error";
 
 export const SALAMANDER_URL = "https://tonejs.github.io/audio/salamander/";
@@ -25,7 +29,10 @@ let tonePromise: Promise<ToneModule> | null = null;
 let piano: import("tone").Sampler | null = null;
 let pianoLoaded: Promise<void> | null = null;
 let sine: import("tone").PolySynth | null = null;
+const synths: Partial<Record<Voice, import("tone").PolySynth>> = {};
 let instrument: Instrument = "piano";
+let mixVoice: Voice = "piano";
+const voiceCounts: Record<Voice, number> = { piano: 0, sine: 0, soft: 0, bell: 0, strings: 0 };
 let unlocked = false;
 let status: AudioStatus = "locked";
 const listeners = new Set<(s: AudioStatus) => void>();
@@ -143,13 +150,7 @@ function watchContext() {
 function ensureInstrument(): Promise<void> {
   if (!Tone) return Promise.resolve();
   if (instrument === "sine") {
-    if (!sine) {
-      sine = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: "sine" },
-        envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.6 },
-        volume: -8,
-      }).toDestination();
-    }
+    synthFor(Tone, "sine");
     setStatus("ready");
     return Promise.resolve();
   }
@@ -182,6 +183,54 @@ export function setInstrument(i: Instrument) {
   if (unlocked) void ensureInstrument();
 }
 
+/** Mix mode: pick a different voice for the next question. No-op otherwise. */
+export function newVoice() {
+  if (instrument !== "mix") return;
+  const others = VOICES.filter((v) => v !== mixVoice);
+  mixVoice = others[Math.floor(Math.random() * others.length)];
+}
+const currentVoice = (): Voice => (instrument === "mix" ? mixVoice : instrument);
+
+function synthFor(T: ToneModule, v: Exclude<Voice, "piano">): import("tone").PolySynth {
+  if (v === "sine") {
+    if (!sine) {
+      sine = new T.PolySynth(T.Synth, {
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.6 },
+        volume: -8,
+      }).toDestination();
+    }
+    return sine;
+  }
+  const have = synths[v];
+  if (have) return have;
+  let made: import("tone").PolySynth;
+  if (v === "soft") {
+    made = new T.PolySynth(T.Synth, {
+      oscillator: { type: "triangle" },
+      envelope: { attack: 0.03, decay: 0.3, sustain: 0.5, release: 0.8 },
+      volume: -6,
+    }).toDestination();
+  } else if (v === "bell") {
+    made = new T.PolySynth(T.FMSynth, {
+      harmonicity: 3,
+      modulationIndex: 6,
+      envelope: { attack: 0.005, decay: 1.2, sustain: 0.15, release: 1.2 },
+      modulationEnvelope: { attack: 0.005, decay: 0.6, sustain: 0.2, release: 0.8 },
+      volume: -10,
+    }).toDestination();
+  } else {
+    const filter = new T.Filter(1800, "lowpass").toDestination();
+    made = new T.PolySynth(T.Synth, {
+      oscillator: { type: "fatsawtooth", count: 3, spread: 18 },
+      envelope: { attack: 0.08, decay: 0.2, sustain: 0.7, release: 0.7 },
+      volume: -16,
+    }).connect(filter);
+  }
+  synths[v] = made;
+  return made;
+}
+
 /** Plays MIDI notes. `at` = seconds from now. Resolves once scheduled. */
 let playCount = 0;
 // Read-only probe for automated checks: is the context running, which instrument played.
@@ -192,6 +241,8 @@ if (typeof window !== "undefined") {
     context: Tone?.getContext().state ?? "not-loaded",
     pianoLoaded: !!piano?.loaded,
     instrument,
+    voice: currentVoice(),
+    voiceCounts: { ...voiceCounts },
     playCount,
   });
   // Test hook: suspend the context the way iOS does on screen lock / app switch.
@@ -212,18 +263,15 @@ async function trigger(midis: number[], dur: number, at = 0, velocity = 0.8) {
   await ensureInstrument();
   const when = T.now() + 0.05 + at;
   playCount++;
-  const usePiano = instrument === "piano" && piano && piano.loaded;
-  if (usePiano) {
-    piano!.triggerAttackRelease(midis.map((m) => midiToFreq(m)), dur, when, velocity);
+  const voice = currentVoice();
+  voiceCounts[voice]++;
+  const freqs = midis.map((m) => midiToFreq(m));
+  if (voice === "piano") {
+    // Samples not loaded (offline first run): fall back to sine so practice continues.
+    if (piano && piano.loaded) piano.triggerAttackRelease(freqs, dur, when, velocity);
+    else synthFor(T, "sine").triggerAttackRelease(freqs, dur, when, velocity);
   } else {
-    if (!sine) {
-      sine = new T.PolySynth(T.Synth, {
-        oscillator: { type: "sine" },
-        envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.6 },
-        volume: -8,
-      }).toDestination();
-    }
-    sine.triggerAttackRelease(midis.map((m) => midiToFreq(m)), dur, when, velocity);
+    synthFor(T, voice).triggerAttackRelease(freqs, dur, when, velocity);
   }
 }
 
@@ -235,6 +283,11 @@ export async function playSequence(midis: number[], step = 0.42, dur = 0.5) {
   for (let i = 0; i < midis.length; i++) await trigger([midis[i]], dur, i * step);
 }
 
+/** Play chords one after another (a cadence that sets up a key). */
+export async function playChords(chords: number[][], step = 0.7, dur = 0.65) {
+  for (let i = 0; i < chords.length; i++) await trigger(chords[i], dur, i * step, 0.6);
+}
+
 /** Wait helper for UI pacing. */
 export const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -242,6 +295,7 @@ export function stopAll() {
   try {
     piano?.releaseAll();
     sine?.releaseAll();
+    Object.values(synths).forEach((x) => x?.releaseAll());
   } catch {
     /* ignore */
   }

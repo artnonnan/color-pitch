@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
 import { MODES, MODE_INTERVALS, MODE_LABEL, pick, type Mode } from "@/lib/music";
-import { playSequence, stopAll } from "@/lib/audio";
+import { newVoice, playSequence, stopAll } from "@/lib/audio";
 import { modesUnlocked } from "@/lib/state";
 import { Button, Card, ScreenHeader, cx } from "../ui";
 import { t } from "@/i18n";
@@ -29,6 +29,7 @@ export function Modes({ onBack }: { onBack: () => void }) {
   const play = (m: Mode) => playSequence(MODE_INTERVALS[m].map((i) => 60 + i), 0.36, 0.45);
 
   const ask = () => {
+    newVoice();
     let m = pick(MODES);
     if (m === last.current) m = pick(MODES);
     last.current = m;

@@ -14,6 +14,8 @@ import { Tuner } from "./exercises/Tuner";
 import { Rush } from "./exercises/Rush";
 import { Sing } from "./exercises/Sing";
 import { Roots } from "./exercises/Roots";
+import { Degrees } from "./exercises/Degrees";
+import { Intervals } from "./exercises/Intervals";
 import { BurstLayer, clearBursts, fireworks } from "./fx/Burst";
 import { Aurora } from "./fx/Aurora";
 import { colorOf } from "@/lib/colors";
@@ -23,10 +25,10 @@ import { t } from "@/i18n";
 
 export type Screen =
   | "home" | "first" | "quiz" | "chords" | "modes" | "tuner" | "stats" | "settings" | "session"
-  | "rush" | "sing" | "roots";
-const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots"];
+  | "rush" | "sing" | "roots" | "degrees" | "intervals";
+const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots", "degrees", "intervals"];
 // Screens that play notes: the daily first note should come before any of them.
-const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots"];
+const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots", "degrees", "intervals"];
 const NAV: { s: Screen; icon: string; label: string }[] = [
   { s: "home", icon: "🏠", label: t.nav.home },
   { s: "tuner", icon: "📻", label: t.nav.tuner },
@@ -116,6 +118,10 @@ function Shell() {
     body = <Sing onBack={home} />;
   } else if (screen === "roots") {
     body = <Roots onBack={home} />;
+  } else if (screen === "degrees") {
+    body = <Degrees onBack={home} />;
+  } else if (screen === "intervals") {
+    body = <Intervals onBack={home} />;
   } else if (screen === "tuner") {
     body = <Tuner />;
   } else if (screen === "stats") {

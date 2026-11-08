@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { colorOf, defaultChordMoods, defaultNoteColors, inkOn } from "@/lib/colors";
 import { CHORD_QUALITIES, isBlack, midiName, NOTE_NAMES, type ChordQuality } from "@/lib/music";
-import { playNote } from "@/lib/audio";
+import { newVoice, playNote } from "@/lib/audio";
 import { defaultProgress, type Instrument } from "@/lib/state";
 import { exportJson, parseImport } from "@/lib/storage";
 import { Button, Card, ScreenHeader, cx } from "../ui";
@@ -147,12 +147,15 @@ export function SettingsScreen() {
             [
               ["piano", "🎹", t.settings.piano, t.settings.pianoSub],
               ["sine", "〰️", t.settings.sine, t.settings.sineSub],
+              ["mix", "🎨", t.settings.mix, t.settings.mixSub],
             ] as [Instrument, string, string, string][]
           ).map(([id, icon, label, sub]) => (
             <button
               key={id}
               onClick={() => setSettings((x) => ({ ...x, instrument: id }))}
+              data-instrument={id}
               className={cx(
+                id === "mix" && "col-span-2",
                 "flex min-h-20 flex-col items-start justify-center rounded-2xl border px-3 text-left",
                 s.instrument === id ? "border-accent bg-accent/15" : "border-line bg-surface-2",
               )}
@@ -164,7 +167,10 @@ export function SettingsScreen() {
             </button>
           ))}
         </div>
-        <Button variant="secondary" className="w-full" onClick={() => void playNote(60)}>
+        <Button variant="secondary" className="w-full" onClick={() => {
+          newVoice();
+          void playNote(60);
+        }}>
           🔊 {t.settings.testSound}
         </Button>
       </Card>

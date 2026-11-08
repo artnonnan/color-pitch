@@ -75,3 +75,14 @@ export function defaultChordMoods(): ChordMoods {
     aug: { color: "#a3e635", emoji: "🌀", mood: "แปลกประหลาด เหมือนฝัน" },
   };
 }
+
+/** One color per scale degree (1–7). Separate from note colors: a degree is a role in the key, not a pitch. */
+export const DEGREE_COLORS: Record<number, string> = {
+  1: "#f59e0b", // gold: home
+  2: "#10b981", // emerald
+  3: "#f472b6", // pink: warm
+  4: "#06b6d4", // cyan: hanging
+  5: "#6366f1", // indigo: open
+  6: "#a78bfa", // lavender: tender
+  7: "#f97316", // orange: pulls home
+};

@@ -1,6 +1,6 @@
 "use client";
 import { useStore } from "@/lib/store";
-import { colorOf } from "@/lib/colors";
+import { colorOf, DEGREE_COLORS } from "@/lib/colors";
 import { CHORD_QUALITIES, NOTE_UNLOCK_ORDER, nameOf } from "@/lib/music";
 import { currentWeek, dayKey, modesUnlocked, rushBest, streak, type SessionStep } from "@/lib/state";
 import { Button, Card, NoteDot, cx } from "../ui";
@@ -201,6 +201,44 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
             <span>
               <span className="block font-bold">{t.exercises.roots.title}</span>
               <span className="block text-xs text-ink-3">{t.exercises.roots.desc}</span>
+            </span>
+          </button>
+          <button
+            onClick={() => go("degrees")}
+            data-testid="card-degrees"
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="flex items-end gap-1">
+              {[1, 3, 5].map((d) => (
+                <span
+                  key={d}
+                  className="flex h-6 w-6 items-center justify-center rounded-lg text-xs font-black text-white"
+                  style={{ background: DEGREE_COLORS[d] }}
+                >
+                  {d}
+                </span>
+              ))}
+              <span className="ml-1 text-xl">🏠</span>
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.degrees.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.degrees.desc}</span>
+            </span>
+          </button>
+          <button
+            onClick={() => go("intervals")}
+            data-testid="card-intervals"
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="flex items-center gap-1">
+              <span className="h-6 w-6 rounded-full" style={{ background: noteCols[0], boxShadow: `0 0 12px ${noteCols[0]}` }} />
+              <span className="h-[2px] w-5 bg-ink-3" />
+              <span className="h-6 w-6 rounded-full" style={{ background: noteCols[1], boxShadow: `0 0 12px ${noteCols[1]}` }} />
+              <span className="ml-1 text-xl">📏</span>
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.intervals.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.intervals.desc}</span>
             </span>
           </button>
           <button

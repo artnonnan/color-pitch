@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
 import { colorOf, inkOn } from "@/lib/colors";
 import { midisOfPc, nameOf, pcOf, pickWeighted, randInt, NOTE_UNLOCK_ORDER, type PC } from "@/lib/music";
-import { playNote, playSequence, stopAll, wait } from "@/lib/audio";
+import { playNote, playSequence, stopAll, wait, newVoice } from "@/lib/audio";
 import { markStepDone, quizWeights, recentNoteAccuracy, recordNoteAnswer, unlockedNotes, UNLOCK_WINDOW } from "@/lib/state";
 import { Keyboard, type KeyFlash } from "../Keyboard";
 import { Button, Card, ColorWash, NoteDot, ProgressBar, ScreenHeader, cx } from "../ui";
@@ -57,6 +57,7 @@ export function Quiz({ onDone, onBack, sessionLabel }: { onDone: () => void; onB
     const options = midisOfPc(pc, st.lowMidi, st.highMidi);
     const midi = options.length ? options[randInt(0, options.length - 1)] : 60 + pc;
     lastPc.current = pc;
+    newVoice();
     (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "note", midi, pc };
     setTarget(midi);
     setFlashes([]);

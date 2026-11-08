@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
 import { colorOf, inkOn } from "@/lib/colors";
 import { centsFromPc, freqToMidiFloat, nameOf, pcOf, pick, type PC } from "@/lib/music";
-import { playNote, stopAll, wait } from "@/lib/audio";
+import { newVoice, playNote, stopAll, wait } from "@/lib/audio";
 import { capturePitch, startMic, type MicError, type MicSession } from "@/lib/pitch";
 import { appendCapped, unlockedNotes } from "@/lib/state";
 import { Keyboard } from "../Keyboard";
@@ -98,6 +98,7 @@ export function Sing({ onBack }: { onBack: () => void }) {
       return;
     }
     setRound((r) => r + 1);
+    newVoice();
     setTarget((prev) => pickTarget(prev));
     setResult(null);
     setPhase("prompt");

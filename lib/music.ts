@@ -106,3 +106,49 @@ export function midisOfPc(pc: PC, lo: number, hi: number): number[] {
   for (let m = lo; m <= hi; m++) if (pcOf(m) === pc) out.push(m);
   return out;
 }
+
+// ---------- scale degrees (functional ear training) ----------
+
+/** Semitones above the tonic for major-scale degrees 1–7. */
+export const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11] as const;
+/** Degree numbers 1–7. */
+export type Degree = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/** Unlock order: the tonic triad first, then the steps around it, then the leading tone. */
+export const DEGREE_UNLOCK_ORDER: Degree[] = [1, 5, 3, 2, 4, 6, 7];
+export const INITIAL_DEGREES = 3;
+
+/**
+ * I–IV–V–I cadence in a major key, voiced close with a bass note, so the key is
+ * clear before the test note. `tonic` should sit in C3–B3.
+ */
+export function cadence(tonic: number): number[][] {
+  return [
+    [tonic - 12, tonic, tonic + 4, tonic + 7], // I
+    [tonic - 7, tonic, tonic + 5, tonic + 9], // IV (2nd inversion)
+    [tonic - 5, tonic - 1, tonic + 2, tonic + 7], // V (1st inversion)
+    [tonic - 12, tonic, tonic + 4, tonic + 7], // I
+  ];
+}
+
+/**
+ * Walk from a degree home to the tonic: 2–5 step down to 1, 6–7 step up to 8.
+ * Returns MIDI notes starting at the degree's note.
+ */
+export function resolution(tonic: number, degree: Degree): number[] {
+  const steps = MAJOR_STEPS.map((s) => tonic + s);
+  const i = degree - 1;
+  if (i === 0) return [steps[0]];
+  if (i >= 5) return [...steps.slice(i), tonic + 12];
+  return steps.slice(0, i + 1).reverse();
+}
+
+// ---------- intervals ----------
+
+export const INTERVALS = ["P8", "P5", "M3", "P4", "m3", "M2", "m2", "M6", "m6", "M7", "m7", "TT"] as const;
+export type Interval = (typeof INTERVALS)[number];
+/** Unlock order is the array order above: wide, consonant contrasts first. */
+export const INTERVAL_SEMITONES: Record<Interval, number> = {
+  m2: 1, M2: 2, m3: 3, M3: 4, P4: 5, TT: 6, P5: 7, m6: 8, M6: 9, m7: 10, M7: 11, P8: 12,
+};
+export const INITIAL_INTERVALS = 3;
+export type IntervalDir = "up" | "down" | "together" | "mix";

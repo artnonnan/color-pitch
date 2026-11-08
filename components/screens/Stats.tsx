@@ -374,6 +374,8 @@ export function Stats() {
           <Tile value={rushBest(p) || "–"} label={t.stats.rushBest} />
           <Tile value={pctOf(p.sing.filter((x) => (x.cents !== null ? Math.abs(x.cents) <= 50 : x.answer === x.target)).length, p.sing.length)} label={t.stats.singAcc} />
           <Tile value={pctOf(p.roots.filter((x) => x.answer === x.target).length, p.roots.length)} label={t.stats.rootAcc} />
+          <Tile value={pctOf(p.degrees.filter((x) => x.answer === x.target).length, p.degrees.length)} label={t.stats.degreeAcc} />
+          <Tile value={pctOf(p.intervals.filter((x) => x.answer === x.target).length, p.intervals.length)} label={t.stats.intervalAcc} />
         </div>
       </Section>
 

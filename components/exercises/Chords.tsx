@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
 import { inkOn, type ChordMood } from "@/lib/colors";
 import { CHORD_INTERVALS, CHORD_QUALITIES, CHORD_SYMBOL, pick, randInt, type ChordQuality } from "@/lib/music";
-import { playChord, stopAll } from "@/lib/audio";
+import { playChord, stopAll, newVoice } from "@/lib/audio";
 import { markStepDone, recentChordAccuracy, recordChordAnswer, unlockedChords, UNLOCK_WINDOW } from "@/lib/state";
 import { Button, Card, ProgressBar, ScreenHeader, cx } from "../ui";
 import { fireworks } from "../fx/Burst";
@@ -54,6 +54,7 @@ export function Chords({ onDone, onBack, sessionLabel }: { onDone: () => void; o
     const q = pick(qs);
     const root = randInt(48, 60); // C3–C4 roots keep chords in a warm middle register
     const midis = CHORD_INTERVALS[q].map((i) => root + i);
+    newVoice();
     (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "chord", quality: q, midis };
     setChord({ q, midis });
     setShown(null);
