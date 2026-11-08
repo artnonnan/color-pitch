@@ -17,13 +17,15 @@ import { recentIntervalAccuracy, recordIntervalAnswer, unlockedIntervals, unlock
 import { Button, Card, ColorWash, NoteDot, ProgressBar, ScreenHeader, cx } from "../ui";
 import { burstFrom, fireworks } from "../fx/Burst";
 import { ComboBadge } from "../fx/Celebration";
+import { Lesson, type LessonStep } from "../Lesson";
+import { refFor, refMidis, type RefTune } from "@/lib/references";
 import { t } from "@/i18n";
 
 const ROUNDS = 10;
 const DIRS: IntervalDir[] = ["up", "down", "together", "mix"];
 /** Answer buttons in size order, so the grid reads like a ruler. */
 const BY_SIZE = [...INTERVALS].sort((a, b) => INTERVAL_SEMITONES[a] - INTERVAL_SEMITONES[b]);
-type Phase = "intro" | "question" | "feedback" | "summary";
+type Phase = "intro" | "lesson" | "question" | "feedback" | "summary";
 interface Q {
   iv: Interval;
   dir: Exclude<IntervalDir, "mix">;
@@ -35,6 +37,43 @@ function play(q: Q) {
   if (q.dir === "together") return playChord([q.low, q.high], 1.6);
   return playSequence(q.dir === "up" ? [q.low, q.high] : [q.high, q.low], 0.75, 0.9);
 }
+const playTune = (tune: RefTune) => playSequence(refMidis(tune), 0.36, 0.42);
+/** The same question asked with another interval, from the same first note (for the hint). */
+function withInterval(q: Q, iv: Interval): Q {
+  const s = INTERVAL_SEMITONES[iv];
+  return q.dir === "down" ? { ...q, iv, low: q.high - s } : { ...q, iv, high: q.low + s };
+}
+const dirLabel = (d: "up" | "down" | "together") => t.intervals.dirs[d === "together" ? "up" : d];
+
+/** Lesson steps for the intervals unlocked so far (grows as more unlock). */
+function lessonSteps(set: Interval[]): LessonStep[] {
+  const L = t.intervals.lesson;
+  const steps: LessonStep[] = [
+    {
+      title: L.introTitle,
+      body: L.introBody,
+      actions: [
+        { label: L.near, play: () => playSequence([60, 62], 0.75, 0.9) },
+        { label: L.far, play: () => playSequence([60, 72], 0.75, 0.9) },
+      ],
+    },
+  ];
+  for (const iv of set) {
+    const up = refFor(iv, "up");
+    const down = refFor(iv, "down");
+    const actions = [{ label: t.intervals.playInterval, play: () => playSequence([60, 60 + INTERVAL_SEMITONES[iv]], 0.75, 0.9) }];
+    if (up) actions.push({ label: `${up.song}`, play: () => playTune(up) });
+    if (down) actions.push({ label: `${down.song} (${t.intervals.dirs.down})`, play: () => playTune(down) });
+    steps.push({ title: t.intervals.names[iv], body: L.ivBody(t.intervals.feel[iv], up?.song ?? null), actions });
+  }
+  steps.push({
+    title: L.compareTitle,
+    body: L.compareBody,
+    actions: set.map((iv) => ({ label: t.intervals.names[iv], play: () => playSequence([60, 60 + INTERVAL_SEMITONES[iv]], 0.75, 0.9) })),
+  });
+  steps.push({ title: L.dirTitle, body: L.dirBody });
+  return steps;
+}
 
 /** Hear two notes, name the distance. The two colors blend in the feedback. */
 export function Intervals({ onBack }: { onBack: () => void }) {
@@ -42,7 +81,8 @@ export function Intervals({ onBack }: { onBack: () => void }) {
   const { settings, progress } = state;
   usePracticeTimer(true);
 
-  const [phase, setPhase] = useState<Phase>("intro");
+  const [phase, setPhase] = useState<Phase>(() => (progress.intervalLessonSeen ? "intro" : "lesson"));
+  const [hinted, setHinted] = useState(false);
   const [q, setQ] = useState<Q | null>(null);
   const [round, setRound] = useState(0);
   const [hits, setHits] = useState(0);
@@ -79,6 +119,7 @@ export function Intervals({ onBack }: { onBack: () => void }) {
     const x: Q = { iv, dir, low, high: low + semis };
     (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "interval", ...x, semis };
     setQ(x);
+    setHinted(false);
     setVerdict(null);
     roundRef.current++;
     setRound(roundRef.current);
@@ -93,7 +134,15 @@ export function Intervals({ onBack }: { onBack: () => void }) {
     const ms = Math.round(performance.now() - askedAt.current);
     let unlocked: Interval | null = null;
     setProgress((p) => {
-      const r = recordIntervalAnswer(p, { t: Date.now(), target: q.iv, answer: a, dir: q.dir, low: pcOf(q.low), ms });
+      const r = recordIntervalAnswer(p, {
+        t: Date.now(),
+        target: q.iv,
+        answer: a,
+        dir: q.dir,
+        low: pcOf(q.low),
+        ms,
+        ...(hinted ? { hinted: true } : {}),
+      });
       unlocked = r.unlocked;
       return r.progress;
     });
@@ -109,11 +158,12 @@ export function Intervals({ onBack }: { onBack: () => void }) {
       setHits(hitsRef.current);
       setCombo((c) => c + 1);
       burstFrom(document.querySelector(`button[data-interval="${a}"]`), [cLow, cHigh], 1.1 + combo / 4);
-      timer.current = window.setTimeout(next, 1500);
+      if (!u) timer.current = window.setTimeout(next, 1500);
     } else {
       setCombo(0);
       void play(q);
-      timer.current = window.setTimeout(next, 3200);
+      // Longer, so there is time to tap the reference tune.
+      if (!u) timer.current = window.setTimeout(next, 4200);
     }
     if (u) window.setTimeout(() => fireworks([cLow, cHigh, "#ffffff"], 6), 200);
   };
@@ -134,6 +184,11 @@ export function Intervals({ onBack }: { onBack: () => void }) {
   const acc = recentIntervalAccuracy(progress);
   const allUnlocked = progress.intervalsUnlocked >= INTERVALS.length;
   const name = (iv: Interval) => t.intervals.names[iv];
+  const finishLesson = () => {
+    setProgress((p) => (p.intervalLessonSeen ? p : { ...p, intervalLessonSeen: true }));
+    stopAll();
+    setPhase("intro");
+  };
   const first = q ? (q.dir === "down" ? q.high : q.low) : 0;
   const second = q ? (q.dir === "down" ? q.low : q.high) : 0;
 
@@ -142,12 +197,17 @@ export function Intervals({ onBack }: { onBack: () => void }) {
       <ScreenHeader
         title={t.exercises.intervals.title}
         onBack={onBack}
-        sub={phase === "intro" ? undefined : t.intervals.round(Math.min(Math.max(round, 1), ROUNDS), ROUNDS)}
+        sub={phase === "intro" || phase === "lesson" ? undefined : t.intervals.round(Math.min(Math.max(round, 1), ROUNDS), ROUNDS)}
       />
       {wash && <ColorWash color={wash.color} k={wash.k} />}
+      {phase === "lesson" ? (
+        <div className="relative z-[11] flex flex-1 flex-col">
+          <Lesson steps={lessonSteps(unlockedSet)} onBegin={finishLesson} />
+        </div>
+      ) : (
       <div className="relative z-[11] flex flex-1 flex-col gap-4">
         <Card className="space-y-2">
-          <div className="text-sm text-ink-2">{acc.n ? t.quiz.accuracyRecent(acc.pct, acc.n) : t.quiz.unlockNeed}</div>
+          <div className="text-sm text-ink-2">{acc.n ? t.quiz.accuracyRecent(acc.pct, acc.n) : t.intervals.unlockNeed}</div>
           {!allUnlocked && <ProgressBar value={acc.n >= UNLOCK_WINDOW ? acc.pct / 100 / 0.9 : acc.n / UNLOCK_WINDOW} />}
         </Card>
 
@@ -177,6 +237,9 @@ export function Intervals({ onBack }: { onBack: () => void }) {
               <Button big onClick={ask} className="pulse-ring" data-testid="intervals-start">
                 ▶ {t.start}
               </Button>
+              <Button variant="ghost" onClick={() => setPhase("lesson")} data-testid="intervals-lesson-open">
+                📖 {t.intervals.lessonOpen}
+              </Button>
             </>
           )}
           {phase === "question" && q && (
@@ -186,9 +249,27 @@ export function Intervals({ onBack }: { onBack: () => void }) {
               </div>
               <p className="text-lg text-ink-2">{t.intervals.listen}</p>
               <p className="text-xs text-ink-3">{t.intervals.dirs[q.dir]}</p>
-              <Button variant="secondary" onClick={() => void play(q)}>
-                ↻ {t.replay}
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => void play(q)}>
+                  ↻ {t.replay}
+                </Button>
+                <Button variant="secondary" onClick={() => setHinted(true)} data-testid="intervals-hint">
+                  💡 {t.intervals.hint}
+                </Button>
+              </div>
+              {hinted && (
+                <Card className="w-full space-y-2">
+                  <div className="text-sm font-bold">{t.intervals.hintTitle}</div>
+                  <div className="grid grid-cols-3 gap-2" data-testid="intervals-hint-panel">
+                    {unlockedSet.map((iv) => (
+                      <Button key={iv} variant="secondary" data-hint-interval={iv} onClick={() => void play(withInterval(q, iv))}>
+                        ▶ {iv}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="text-xs text-ink-3">{t.intervals.hintNote}</div>
+                </Card>
+              )}
             </>
           )}
           {phase === "feedback" && q && verdict && (
@@ -211,6 +292,16 @@ export function Intervals({ onBack }: { onBack: () => void }) {
               <div className="text-xs text-ink-3">{t.next} ›</div>
             </button>
           )}
+          {phase === "feedback" && q && verdict && (
+            <RefCard
+              iv={verdict.unlocked ?? q.iv}
+              dir={verdict.unlocked ? "up" : q.dir}
+              isNew={!!verdict.unlocked}
+              onPlay={() => {
+                if (timer.current) window.clearTimeout(timer.current);
+              }}
+            />
+          )}
           {phase === "summary" && (
             <div className="w-full space-y-4">
               <div className="text-6xl">{hits >= ROUNDS * 0.8 ? "🏆" : "🎶"}</div>
@@ -223,7 +314,7 @@ export function Intervals({ onBack }: { onBack: () => void }) {
         </div>
 
         {(phase === "question" || phase === "feedback") && (
-          <div className="grid grid-cols-3 gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="grid grid-cols-3 gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]" data-testid="intervals-grid">
             {BY_SIZE.map((iv) => {
               const on = unlockedSet.includes(iv);
               const isTarget = phase === "feedback" && q?.iv === iv;
@@ -251,6 +342,47 @@ export function Intervals({ onBack }: { onBack: () => void }) {
           </div>
         )}
       </div>
+      )}
     </div>
+  );
+}
+
+/** "จำด้วยเพลง…" for the right answer, or a card introducing a newly unlocked interval. */
+function RefCard({ iv, dir, isNew, onPlay }: { iv: Interval; dir: "up" | "down" | "together"; isNew: boolean; onPlay: () => void }) {
+  const tune = refFor(iv, dir);
+  const name = t.intervals.names[iv];
+  return (
+    <Card className={cx("w-full space-y-2 text-center", isNew && "ring-2 ring-accent")} >
+      {isNew && <div className="font-bold" data-testid="intervals-new-card">{t.intervals.newCard(name)}</div>}
+      <div className="text-sm text-ink-2">{t.intervals.feel[iv]}</div>
+      <div className="text-xs text-ink-3" data-testid="intervals-remember">
+        {tune ? t.intervals.remember(tune.song, dirLabel(dir)) : t.intervals.noSong}
+      </div>
+      <div className="flex justify-center gap-2">
+        {isNew && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onPlay();
+              void playSequence([60, 60 + INTERVAL_SEMITONES[iv]], 0.75, 0.9);
+            }}
+          >
+            ▶ {t.intervals.playInterval}
+          </Button>
+        )}
+        {tune && (
+          <Button
+            variant="secondary"
+            data-testid="intervals-play-song"
+            onClick={() => {
+              onPlay();
+              void playTune(tune);
+            }}
+          >
+            🎵 {t.intervals.playSong}
+          </Button>
+        )}
+      </div>
+    </Card>
   );
 }

@@ -7,6 +7,12 @@ The player hears an I–IV–V–I cadence in a random major key, then one note,
 
 ## Sub-features
 
+- `deg-lesson`: shown automatically until `progress.degreeLessonSeen`, then from "📖 เรียนก่อน". It uses the shared `Lesson`, always in C major:
+  1. The cadence sets home (plays I–IV–V–I).
+  2. 1 · 3 · 5 are stable: the home chord, then 1, 3 or 5.
+  3. The other degrees want to move: 2 → 1, 4 → 3, 6 → 5, 7 → 1.
+  4. Trick: walk home and count the steps (5 → 1).
+- `deg-hint`: "💡 ใบ้: ฟังเดินกลับบ้าน" plays the resolution walk of the test note before answering, so the player can count steps. It shows a note that the question won't count. The answer is logged with `hinted: true` and never counts toward unlocks.
 - `deg-cadence`: during the cadence the prompt reads "กำลังเล่นคอร์ดตั้งคีย์…" and the answer buttons are disabled. They open about 3 s later, after the test note.
 - `deg-answer`: an answer logs `{key, target, answer, ms}` to `progress.degrees` and shows "ใช่เลย!" or "นี่คือขั้น N".
 - `deg-reveal`: the feedback names the key, the degree and the real note, with that note's color dot.
@@ -26,7 +32,9 @@ Preconditions:
 
 - `doctor` passes. Fresh profile: degrees 1, 5 and 3 are unlocked.
 
-- **Play one set.** Play 10 questions with one deliberate miss on round 3. Run `node scripts/drive.cjs .claude/skills/verify-color-pitch/recipes/degrees.js`. Then `after.json` shows:
+- **Lesson and one set.** Run `node scripts/drive.cjs .claude/skills/verify-color-pitch/recipes/degrees.js`. It walks the lesson and taps every example. Then it plays 10 questions: question 2 uses the hint, and round 3 is a deliberate miss. Then `after.json` shows:
+  - `lessonSteps` plays = [4, 3, 7, 3] (cadence, home chords, pairs, the walk), `lessonSeen: true`
+  - `hint.plays` = the walk length for that degree, `hint.note: true`, `hintedLogged: 1`
   - `logged: 10`, `correctLogged: 9`, `summary: "ถูก 9 จาก 10 ข้อ"`, `statsTile: "90%"`
   - `degreesAsked` ⊆ [1, 3, 5]
   - `distinctKeys` > 1

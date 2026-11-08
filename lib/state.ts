@@ -98,6 +98,8 @@ export interface DegreeAnswer {
   target: Degree;
   answer: Degree;
   ms: number;
+  /** Heard the walk home before answering: logged, never counts toward unlocks. */
+  hinted?: boolean;
 }
 export interface IntervalAnswer {
   t: number;
@@ -107,6 +109,8 @@ export interface IntervalAnswer {
   /** Lower note's pitch class. */
   low: PC;
   ms: number;
+  /** Compared candidate intervals before answering: logged, never counts toward unlocks. */
+  hinted?: boolean;
 }
 /** One chord slot of a progression (the player names chords 2–4, one entry each). */
 export interface ProgressionChordAnswer {
@@ -168,6 +172,8 @@ export interface Progress {
   progLevelSince: number;
   /** The intro lesson (I = home, V = tension, IV = open) was finished once. */
   progLessonSeen: boolean;
+  intervalLessonSeen: boolean;
+  degreeLessonSeen: boolean;
   melodyLevel: number; // index into MELODY_LENGTHS
   melodySetSince: number;
   melodies: MelodyNoteAnswer[];
@@ -240,6 +246,8 @@ export function defaultProgress(): Progress {
     progLevel: 0,
     progLevelSince: 0,
     progLessonSeen: false,
+    intervalLessonSeen: false,
+    degreeLessonSeen: false,
     melodyLevel: 0,
     melodySetSince: 0,
     melodies: [],
@@ -367,9 +375,9 @@ export const recentChordAccuracy = (p: Progress) =>
   recent(p.chordAnswers, p.chordsSetSince, (a) => a.target === a.answer);
 
 export const recentDegreeAccuracy = (p: Progress) =>
-  recent(p.degrees, p.degreesSetSince, (a) => a.target === a.answer);
+  recent(p.degrees.filter((a) => !a.hinted), p.degreesSetSince, (a) => a.target === a.answer);
 export const recentIntervalAccuracy = (p: Progress) =>
-  recent(p.intervals, p.intervalsSetSince, (a) => a.target === a.answer);
+  recent(p.intervals.filter((a) => !a.hinted), p.intervalsSetSince, (a) => a.target === a.answer);
 
 export const recentProgressionAccuracy = (p: Progress) =>
   recent(
@@ -413,6 +421,7 @@ export function recordChordAnswer(
 }
 export function recordDegreeAnswer(p: Progress, a: DegreeAnswer): { progress: Progress; unlocked: Degree | null } {
   let next: Progress = { ...p, degrees: capped(p.degrees, a) };
+  if (a.hinted) return { progress: next, unlocked: null };
   if (next.degreesUnlocked < DEGREE_UNLOCK_ORDER.length && meetsUnlock(recentDegreeAccuracy(next))) {
     const unlocked = DEGREE_UNLOCK_ORDER[next.degreesUnlocked];
     next = { ...next, degreesUnlocked: next.degreesUnlocked + 1, degreesSetSince: a.t + 1 };
@@ -425,6 +434,7 @@ export function recordIntervalAnswer(
   a: IntervalAnswer,
 ): { progress: Progress; unlocked: Interval | null } {
   let next: Progress = { ...p, intervals: capped(p.intervals, a) };
+  if (a.hinted) return { progress: next, unlocked: null };
   if (next.intervalsUnlocked < INTERVALS.length && meetsUnlock(recentIntervalAccuracy(next))) {
     const unlocked = INTERVALS[next.intervalsUnlocked];
     next = { ...next, intervalsUnlocked: next.intervalsUnlocked + 1, intervalsSetSince: a.t + 1 };

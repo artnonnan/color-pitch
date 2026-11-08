@@ -3,21 +3,56 @@ import { useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
 import { colorOf, DEGREE_COLORS, inkOn } from "@/lib/colors";
 import { cadence, DEGREE_UNLOCK_ORDER, MAJOR_STEPS, nameOf, pick, randInt, resolution, type Degree, type PC } from "@/lib/music";
-import { newVoice, playChords, playNote, playSequence, stopAll, wait } from "@/lib/audio";
+import { newVoice, playChord, playChords, playNote, playSequence, stopAll, wait } from "@/lib/audio";
 import { recentDegreeAccuracy, recordDegreeAnswer, unlockedDegrees, unlockedNotes, UNLOCK_WINDOW } from "@/lib/state";
 import { Button, Card, ColorWash, NoteDot, ProgressBar, ScreenHeader, cx } from "../ui";
 import { burstFrom, fireworks } from "../fx/Burst";
 import { ComboBadge } from "../fx/Celebration";
+import { Lesson, type LessonStep } from "../Lesson";
 import { t } from "@/i18n";
 
 const ROUNDS = 10;
 const DEGREES: Degree[] = [1, 2, 3, 4, 5, 6, 7];
-type Phase = "intro" | "playing" | "question" | "feedback" | "summary";
+type Phase = "intro" | "lesson" | "playing" | "question" | "feedback" | "summary";
 interface Q {
   key: PC;
   tonic: number; // MIDI of the tonic the cadence uses (C3–B3)
   degree: Degree;
   midi: number; // the test note, one octave above the tonic
+}
+
+// ---- lesson (always in C major) ----
+const HOME_CHORD = [36, 48, 52, 55]; // C major with a low C
+const C4 = 60;
+const degMidi = (d: Degree) => C4 + MAJOR_STEPS[d - 1];
+/** The home chord, then notes. */
+async function afterHome(notes: number[]) {
+  await playChord(HOME_CHORD, 0.9);
+  await wait(1000);
+  await playSequence(notes, 0.5, 0.6);
+}
+function lessonSteps(): LessonStep[] {
+  const L = t.degrees.lesson;
+  const n = t.degrees.names;
+  return [
+    { title: L.keyTitle, body: L.keyBody, actions: [{ label: L.keyPlay, play: () => playChords(cadence(48)) }] },
+    {
+      title: L.stableTitle,
+      body: L.stableBody,
+      actions: ([1, 3, 5] as Degree[]).map((d) => ({ label: `${d} (${n[d]})`, play: () => afterHome([degMidi(d)]) })),
+    },
+    {
+      title: L.moveTitle,
+      body: L.moveBody,
+      actions: [
+        { label: "2 → 1", play: () => afterHome([62, 60]) },
+        { label: "4 → 3", play: () => afterHome([65, 64]) },
+        { label: "6 → 5", play: () => afterHome([69, 67]) },
+        { label: "7 → 1", play: () => afterHome([71, 72]) },
+      ],
+    },
+    { title: L.trickTitle, body: L.trickBody, actions: [{ label: L.walk5, play: () => afterHome([67, 65, 64, 62, 60]) }] },
+  ];
 }
 
 /** Functional ear training: a cadence sets the key, then name the degree of one note. */
@@ -26,7 +61,8 @@ export function Degrees({ onBack }: { onBack: () => void }) {
   const { settings, progress } = state;
   usePracticeTimer(true);
 
-  const [phase, setPhase] = useState<Phase>("intro");
+  const [phase, setPhase] = useState<Phase>(() => (progress.degreeLessonSeen ? "intro" : "lesson"));
+  const [hinted, setHinted] = useState(false);
   const [q, setQ] = useState<Q | null>(null);
   const [round, setRound] = useState(0);
   const [hits, setHits] = useState(0);
@@ -74,6 +110,7 @@ export function Degrees({ onBack }: { onBack: () => void }) {
     const x: Q = { key, tonic, degree, midi: tonic + 12 + MAJOR_STEPS[degree - 1] };
     (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "degree", ...x };
     setQ(x);
+    setHinted(false);
     setVerdict(null);
     roundRef.current++;
     setRound(roundRef.current);
@@ -86,7 +123,14 @@ export function Degrees({ onBack }: { onBack: () => void }) {
     const ms = Math.round(performance.now() - askedAt.current);
     let unlocked: Degree | null = null;
     setProgress((p) => {
-      const r = recordDegreeAnswer(p, { t: Date.now(), key: q.key, target: q.degree, answer: d, ms });
+      const r = recordDegreeAnswer(p, {
+        t: Date.now(),
+        key: q.key,
+        target: q.degree,
+        answer: d,
+        ms,
+        ...(hinted ? { hinted: true } : {}),
+      });
       unlocked = r.unlocked;
       return r.progress;
     });
@@ -124,6 +168,17 @@ export function Degrees({ onBack }: { onBack: () => void }) {
     ask();
   }
 
+  const finishLesson = () => {
+    setProgress((p) => (p.degreeLessonSeen ? p : { ...p, degreeLessonSeen: true }));
+    stopAll();
+    setPhase("intro");
+  };
+  /** Hint: walk the test note home, so the player can count the steps. */
+  const hint = () => {
+    if (!q || phase !== "question") return;
+    setHinted(true);
+    void playSequence(resolution(q.tonic + 12, q.degree), 0.42, 0.5);
+  };
   const unlockedSet = unlockedDegrees(progress);
   const acc = recentDegreeAccuracy(progress);
   const allUnlocked = progress.degreesUnlocked >= DEGREE_UNLOCK_ORDER.length;
@@ -134,12 +189,17 @@ export function Degrees({ onBack }: { onBack: () => void }) {
       <ScreenHeader
         title={t.exercises.degrees.title}
         onBack={onBack}
-        sub={phase === "intro" ? undefined : t.degrees.round(Math.min(Math.max(round, 1), ROUNDS), ROUNDS)}
+        sub={phase === "intro" || phase === "lesson" ? undefined : t.degrees.round(Math.min(Math.max(round, 1), ROUNDS), ROUNDS)}
       />
       {wash && <ColorWash color={wash.color} k={wash.k} />}
+      {phase === "lesson" ? (
+        <div className="relative z-[11] flex flex-1 flex-col">
+          <Lesson steps={lessonSteps()} onBegin={finishLesson} />
+        </div>
+      ) : (
       <div className="relative z-[11] flex flex-1 flex-col gap-4">
         <Card className="space-y-2">
-          <div className="text-sm text-ink-2">{acc.n ? t.quiz.accuracyRecent(acc.pct, acc.n) : t.quiz.unlockNeed}</div>
+          <div className="text-sm text-ink-2">{acc.n ? t.quiz.accuracyRecent(acc.pct, acc.n) : t.degrees.unlockNeed}</div>
           {!allUnlocked && <ProgressBar value={acc.n >= UNLOCK_WINDOW ? acc.pct / 100 / 0.9 : acc.n / UNLOCK_WINDOW} />}
         </Card>
 
@@ -150,6 +210,9 @@ export function Degrees({ onBack }: { onBack: () => void }) {
               <p className="text-ink-2">{t.exercises.degrees.desc}</p>
               <Button big onClick={ask} className="pulse-ring" data-testid="degrees-start">
                 ▶ {t.start}
+              </Button>
+              <Button variant="ghost" onClick={() => setPhase("lesson")} data-testid="degrees-lesson-open">
+                📖 {t.degrees.lessonOpen}
               </Button>
             </>
           )}
@@ -167,6 +230,10 @@ export function Degrees({ onBack }: { onBack: () => void }) {
                   ♪ {t.degrees.replayNote}
                 </Button>
               </div>
+              <Button variant="ghost" disabled={phase !== "question"} onClick={hint} data-testid="degrees-hint">
+                💡 {t.degrees.hint}
+              </Button>
+              {hinted && <p className="text-xs text-ink-3" data-testid="degrees-hint-note">{t.degrees.hintNote}</p>}
             </>
           )}
           {phase === "feedback" && q && verdict && (
@@ -239,6 +306,7 @@ export function Degrees({ onBack }: { onBack: () => void }) {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
