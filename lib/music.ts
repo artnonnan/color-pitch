@@ -167,27 +167,70 @@ export const INITIAL_NUMERALS = 3;
 export const PROGRESSION_LEN = 4;
 
 /**
- * A diatonic triad in a major key: a bass root plus close upper voices kept in one
- * window above the tonic, so the chords move smoothly. `tonic` should sit in C3–B3.
+ * Every chord the progression exercise can use, relative to the key's tonic:
+ * `root` = semitones above the tonic, `iv` = chord intervals, `deg` = scale degree of the
+ * root (for the degree color), `sym` = chord-name suffix. Minor-key chords are relative
+ * to the minor tonic (i = the tonic minor chord).
  */
-export function diatonicTriad(tonic: number, n: Numeral): number[] {
-  const i = NUMERAL_DEGREE[n] - 1;
+export const PROG_CHORDS = {
+  // major key, diatonic triads
+  I: { root: 0, iv: [0, 4, 7], deg: 1, sym: "" },
+  ii: { root: 2, iv: [0, 3, 7], deg: 2, sym: "m" },
+  iii: { root: 4, iv: [0, 3, 7], deg: 3, sym: "m" },
+  IV: { root: 5, iv: [0, 4, 7], deg: 4, sym: "" },
+  V: { root: 7, iv: [0, 4, 7], deg: 5, sym: "" },
+  vi: { root: 9, iv: [0, 3, 7], deg: 6, sym: "m" },
+  // minor key (natural minor)
+  i: { root: 0, iv: [0, 3, 7], deg: 1, sym: "m" },
+  iv: { root: 5, iv: [0, 3, 7], deg: 4, sym: "m" },
+  v: { root: 7, iv: [0, 3, 7], deg: 5, sym: "m" },
+  III: { root: 3, iv: [0, 4, 7], deg: 3, sym: "" },
+  VI: { root: 8, iv: [0, 4, 7], deg: 6, sym: "" },
+  VII: { root: 10, iv: [0, 4, 7], deg: 7, sym: "" },
+  // major key, seventh chords
+  Imaj7: { root: 0, iv: [0, 4, 7, 11], deg: 1, sym: "maj7" },
+  ii7: { root: 2, iv: [0, 3, 7, 10], deg: 2, sym: "m7" },
+  IVmaj7: { root: 5, iv: [0, 4, 7, 11], deg: 4, sym: "maj7" },
+  V7: { root: 7, iv: [0, 4, 7, 10], deg: 5, sym: "7" },
+  vi7: { root: 9, iv: [0, 3, 7, 10], deg: 6, sym: "m7" },
+  // major key, borrowed and secondary chords (iv above doubles as the borrowed minor iv)
+  bVII: { root: 10, iv: [0, 4, 7], deg: 7, sym: "" },
+  bVI: { root: 8, iv: [0, 4, 7], deg: 6, sym: "" },
+  VofV: { root: 2, iv: [0, 4, 7], deg: 2, sym: "" },
+} as const;
+export type ProgChord = keyof typeof PROG_CHORDS;
+/** How a chord is written on buttons and slots. */
+export const progLabel = (c: ProgChord): string => (c === "bVII" ? "♭VII" : c === "bVI" ? "♭VI" : c === "VofV" ? "V/V" : c);
+
+/**
+ * A chord voiced for the progression exercise: a bass root plus close upper voices kept in
+ * one window above the tonic, so chords move smoothly. `tonic` should sit in C3–B3.
+ */
+export function progChordMidis(tonic: number, c: ProgChord): number[] {
+  const d = PROG_CHORDS[c];
   const lo = tonic + 4;
-  const upper = [0, 2, 4].map((k) => {
-    let m = tonic + MAJOR_STEPS[(i + k) % 7];
+  const upper = d.iv.map((s) => {
+    let m = tonic + d.root + s;
     while (m < lo) m += 12;
     while (m >= lo + 12) m -= 12;
     return m;
   });
-  return [tonic - 12 + MAJOR_STEPS[i], ...upper.sort((a, b) => a - b)];
+  return [tonic - 12 + d.root, ...[...new Set(upper)].sort((a, b) => a - b)];
 }
+/** Back-compat name for the triads of the first levels. */
+export const diatonicTriad = (tonic: number, n: Numeral) => progChordMidis(tonic, n);
 
 /**
- * I followed by random chords from `set`. With `noRepeat`, never the same chord twice in a
- * row. Two-chord levels allow I → I, so "it stayed home" is a real answer.
+ * `home` followed by random chords from `set`. With `noRepeat`, never the same chord twice in
+ * a row. Two-chord levels allow home → home, so "it stayed home" is a real answer.
  */
-export function randomProgression(set: readonly Numeral[], len = PROGRESSION_LEN, noRepeat = true): Numeral[] {
-  const out: Numeral[] = ["I"];
+export function randomProgression(
+  set: readonly ProgChord[],
+  len = PROGRESSION_LEN,
+  noRepeat = true,
+  home: ProgChord = "I",
+): ProgChord[] {
+  const out: ProgChord[] = [home];
   while (out.length < len) {
     const prev = out[out.length - 1];
     const options = noRepeat ? set.filter((x) => x !== prev) : [...set];

@@ -1,9 +1,10 @@
 # Chord progressions (ทางเดินคอร์ด)
 
-The player hears chords in a random major key. The first chord is always I. They name the rest by function.
+The player hears chords in a random key. The first chord is always the level's home chord (I, i or Imaj7). They name the rest by function.
 - **Lesson:** a short lesson comes first.
-- **Levels:** four levels, easiest first.
-- **Hint:** a "💡 ใบ้" button lets the player compare I → each choice before answering.
+- **Levels:** seven levels, easiest first.
+- **Hint:** a "💡 ใบ้" button lets the player compare home → each choice before answering.
+- **Skip test:** "🚀 สอบข้ามไประดับ N" lets a strong player jump ahead.
 
 | Level | Plays | Choices | Answers |
 |---|---|---|---|
@@ -11,11 +12,24 @@ The player hears chords in a random major key. The first chord is always I. They
 | 2 | I + 1 chord (I → I allowed) | I, IV, V | 1 |
 | 3 | I + 2 chords, no repeats | I, IV, V | 2 |
 | 4 | I + 3 chords, no repeats | unlocked set (I, IV, V, then vi, ii, iii) | 3 |
+| 5 | minor key: i + 3 chords | i, iv, v, III, VI, VII | 3 |
+| 6 | sevenths: Imaj7 + 3 chords | Imaj7, ii7, IVmaj7, V7, vi7 | 3 |
+| 7 | borrowed and secondary: I + 3 chords | IV, V, ♭VII, iv, ♭VI, V/V | 3 |
 
 - **Moving up:** every level moves on by the 30-answer, ≥ 90 % rule (each named chord is one answer). Only level 4 unlocks vi, ii and iii.
 - **Hinted answers** are logged with `hinted: true` but never count toward a level or an unlock.
 
 ## Sub-features
+
+- `prog-chords`: every chord is defined in `PROG_CHORDS` (`lib/music.ts`) by root offset, intervals, degree color and name suffix. `progChordMidis` voices triads and sevenths around the tonic, and `progLabel` writes ♭VII, ♭VI and V/V.
+- `prog-advanced`:
+  - Level 4 still unlocks vi, ii and iii one by one. Once all six are unlocked, the next 30-answer, ≥ 90 % run moves the player to level 5. Levels 5→6→7 move up by the same rule.
+  - Level 5 says "คีย์ X ไมเนอร์" in the reveal.
+- `prog-skip`:
+  - From the intro, "🚀 สอบข้ามไประดับ N" runs 10 questions at the next level. Each answer is logged with `test: true`, and test answers never enter the accuracy window.
+  - The card shows "ถูกทั้งชุดแล้ว N ข้อ (ต้องได้ 9)". A hinted question doesn't count as a hit.
+  - The summary says "ผ่าน! ข้ามไประดับ N" (`passSkipTest`; passing beyond level 4 also unlocks all six triads), or "ได้ N ข้อ ยังไม่ถึง 9…".
+  - "เสร็จแล้ว" returns to the intro.
 
 - `prog-lesson`: it opens automatically until `progress.progLessonSeen`, and later from "📖 เรียนก่อน" on the intro. There are 5 steps, all in C major:
   1. Chords have functions.
@@ -67,6 +81,9 @@ Preconditions:
 - **Level 4 and vi** have not been driven yet: it takes another 30 + 30 answers. Level 4 uses the same rule path, with `numeralsSetSince` reset at the level change.
 
 ## Gotchas
+
+- **Advanced recipe.** `recipes/progressions-advanced.js` (about 7 min) fails one skip test on purpose (8/10), then passes six tests up to level 7 (one with a hint). It checks every revealed chord name against theory. On 2026-11-08: 230 names checked, 0 wrong, `progLevel: 6`, `numeralsUnlocked: 6`. Normal-play level-ups 5→6→7 have not been driven.
+- `__cpQuestion` now also has `minor` and `test`.
 
 - `__cpQuestion` is `{kind: "progression", key, tonic, chords, choices, level}`. The player answers `chords[1..]`.
 - `recentProgressionAccuracy` drops hinted answers, then windows from `progLevelSince` (levels 1–3) or `numeralsSetSince` (level 4).

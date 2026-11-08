@@ -1,24 +1,27 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useStore, usePracticeTimer } from "@/lib/store";
-import { colorOf, DEGREE_COLORS, inkOn, type NoteColors } from "@/lib/colors";
+import { colorOf, DEGREE_COLORS, inkOn, type NoteColors, type ChordMoods } from "@/lib/colors";
 import {
-  CHORD_SYMBOL,
-  MAJOR_STEPS,
-  NUMERAL_DEGREE,
-  NUMERAL_QUALITY,
   NUMERALS,
-  diatonicTriad,
+  PROG_CHORDS,
   nameOf,
+  progChordMidis,
+  progLabel,
   randInt,
   randomProgression,
   type Numeral,
   type PC,
+  type ProgChord,
 } from "@/lib/music";
 import { newVoice, playChord, playChords, stopAll, wait } from "@/lib/audio";
 import {
   PROG_LAST_LEVEL,
   PROG_LEVELS,
+  PROG_NUMERAL_LEVEL,
+  SKIP_TEST_PASS,
+  SKIP_TEST_ROUNDS,
+  passSkipTest,
   progSpec,
   recentProgressionAccuracy,
   recordProgression,
@@ -26,7 +29,6 @@ import {
   unlockedNumerals,
   UNLOCK_WINDOW,
 } from "@/lib/state";
-import type { ChordMoods } from "@/lib/colors";
 import { Button, Card, ColorWash, ProgressBar, ScreenHeader, cx } from "../ui";
 import { burstFrom, fireworks } from "../fx/Burst";
 import { ComboBadge } from "../fx/Celebration";
@@ -37,22 +39,29 @@ const STEP = 1.1; // seconds between chords
 const LESSON_TONIC = 48; // C3: the lesson always uses C major
 type Phase = "intro" | "lesson" | "playing" | "question" | "feedback" | "summary";
 interface Q {
-  key: PC;
+  key: PC; // tonic pitch class (the minor tonic on minor levels)
   tonic: number; // MIDI, C3–B3
-  chords: Numeral[];
-  choices: Numeral[];
+  chords: ProgChord[];
+  choices: ProgChord[];
   level: number;
+  minor: boolean;
+}
+/** A level-skip test in progress: 10 questions at `level`, `hits` fully right without hints. */
+interface Test {
+  level: number;
+  hits: number;
 }
 
-/** Root pitch class of a numeral in a key. */
-const rootOf = (key: PC, n: Numeral) => (key + MAJOR_STEPS[NUMERAL_DEGREE[n] - 1]) % 12;
-/** Chord name in the key, e.g. vi in G → "Em". */
-const chordName = (key: PC, n: Numeral) => nameOf(rootOf(key, n)) + CHORD_SYMBOL[NUMERAL_QUALITY[n]];
-const playSeq = (tonic: number, seq: Numeral[]) => playChords(seq.map((n) => diatonicTriad(tonic, n)), STEP, STEP * 0.95);
+/** Root pitch class of a chord in a key. */
+const rootOf = (key: PC, c: ProgChord) => (key + PROG_CHORDS[c].root) % 12;
+/** Chord name in the key, e.g. vi in G → "Em", V7 in C → "G7". */
+const chordName = (key: PC, c: ProgChord) => nameOf(rootOf(key, c)) + PROG_CHORDS[c].sym;
+const playSeq = (tonic: number, seq: ProgChord[]) => playChords(seq.map((c) => progChordMidis(tonic, c)), STEP, STEP * 0.95);
 
 /**
- * Hear chords that start on I and name the rest by function. A short lesson comes first,
- * then four levels: one chord (IV or V), one chord (I, IV or V), three chords, four chords.
+ * Hear chords that start on the home chord and name the rest by function. A short lesson
+ * comes first, then seven levels: one chord (IV or V) up to four-chord progressions, then
+ * minor keys, seventh chords, and borrowed chords. A level-skip test lets strong players move up.
  */
 export function Progressions({ onBack }: { onBack: () => void }) {
   const { state, setProgress, getState } = useStore();
@@ -61,19 +70,22 @@ export function Progressions({ onBack }: { onBack: () => void }) {
 
   const [phase, setPhase] = useState<Phase>(() => (progress.progLessonSeen ? "intro" : "lesson"));
   const [q, setQ] = useState<Q | null>(null);
-  const [picks, setPicks] = useState<Numeral[]>([]);
+  const [picks, setPicks] = useState<ProgChord[]>([]);
   const [hinted, setHinted] = useState(false);
   const [round, setRound] = useState(0);
   const [hits, setHits] = useState(0);
   const [combo, setCombo] = useState(0);
   const [verdict, setVerdict] = useState<{ correct: number; unlocked: Numeral | null; levelUp: number | null } | null>(null);
-  const [playingAt, setPlayingAt] = useState<number | null>(null); // slot lit while its chord plays
+  const [playingAt, setPlayingAt] = useState<number | null>(null);
   const [wash, setWash] = useState<{ color: string; k: number } | null>(null);
+  const [test, setTest] = useState<Test | null>(null);
+  const [testResult, setTestResult] = useState<{ level: number; hits: number; passed: boolean } | null>(null);
   const k = useRef(0);
   const qid = useRef(0);
   const timer = useRef<number | null>(null);
   const roundRef = useRef(0);
   const hitsRef = useRef(0);
+  const testRef = useRef<Test | null>(null);
 
   useEffect(
     () => () => {
@@ -106,16 +118,17 @@ export function Progressions({ onBack }: { onBack: () => void }) {
   const ask = () => {
     qid.current++;
     newVoice();
-    const spec = progSpec(getState().progress);
+    const spec = progSpec(getState().progress, testRef.current?.level);
     const key = randInt(0, 11);
     const x: Q = {
       key,
       tonic: 48 + key,
-      chords: randomProgression(spec.choices, spec.len, spec.len > 2),
+      chords: randomProgression(spec.choices, spec.len, spec.len > 2, spec.home),
       choices: spec.choices,
       level: spec.level,
+      minor: spec.minor,
     };
-    (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "progression", ...x };
+    (window as unknown as { __cpQuestion?: unknown }).__cpQuestion = { kind: "progression", ...x, test: !!testRef.current };
     setQ(x);
     setPicks([]);
     setHinted(false);
@@ -125,15 +138,28 @@ export function Progressions({ onBack }: { onBack: () => void }) {
     void playQuestion(x);
   };
 
-  const finishLesson = () => {
-    setProgress((p) => (p.progLessonSeen ? p : { ...p, progLessonSeen: true }));
-    stopAll();
+  const startSet = (testLevel?: number) => {
+    roundRef.current = 0;
+    hitsRef.current = 0;
+    setHits(0);
+    setCombo(0);
+    setTestResult(null);
+    const tst = testLevel !== undefined ? { level: testLevel, hits: 0 } : null;
+    testRef.current = tst;
+    setTest(tst);
     ask();
   };
 
-  const grade = (x: Q, ans: Numeral[]) => {
+  const finishLesson = () => {
+    setProgress((p) => (p.progLessonSeen ? p : { ...p, progLessonSeen: true }));
+    stopAll();
+    startSet();
+  };
+
+  const grade = (x: Q, ans: ProgChord[]) => {
     const now = Date.now();
-    const ask_ = x.chords.length - 1;
+    const need = x.chords.length - 1;
+    const inTest = !!testRef.current;
     const answers = ans.map((a, i) => ({
       t: now,
       key: x.key,
@@ -142,6 +168,7 @@ export function Progressions({ onBack }: { onBack: () => void }) {
       answer: a,
       level: x.level,
       ...(hinted ? { hinted: true } : {}),
+      ...(inTest ? { test: true } : {}),
     }));
     const correct = answers.filter((a) => a.answer === a.target).length;
     let unlocked: Numeral | null = null;
@@ -154,25 +181,26 @@ export function Progressions({ onBack }: { onBack: () => void }) {
     });
     const u = unlocked as Numeral | null;
     const lv = levelUp as number | null;
-    const all = correct === ask_;
+    const all = correct === need;
+    if (inTest && all && !hinted) testRef.current = { ...testRef.current!, hits: testRef.current!.hits + 1 };
+    if (inTest) setTest(testRef.current);
     k.current++;
     setVerdict({ correct, unlocked: u, levelUp: lv });
     setPhase("feedback");
-    // Wash in the last chord's root color: the function is relative, the root is absolute.
-    setWash({ color: colorOf(settings.noteColors, rootOf(x.key, x.chords[ask_])), k: k.current });
+    setWash({ color: colorOf(settings.noteColors, rootOf(x.key, x.chords[need])), k: k.current });
     if (all) {
       hitsRef.current++;
       setHits(hitsRef.current);
       setCombo((c) => c + 1);
       burstFrom(
         document.querySelector('[data-testid="progressions-slots"]'),
-        x.chords.map((n) => colorOf(settings.noteColors, rootOf(x.key, n))),
+        x.chords.map((c) => colorOf(settings.noteColors, rootOf(x.key, c))),
         1.2 + combo / 4,
       );
     } else {
       setCombo(0);
     }
-    if (u) window.setTimeout(() => fireworks([DEGREE_COLORS[NUMERAL_DEGREE[u]], "#ffffff"], 6), 200);
+    if (u) window.setTimeout(() => fireworks([DEGREE_COLORS[PROG_CHORDS[u].deg], "#ffffff"], 6), 200);
     if (lv !== null) window.setTimeout(() => fireworks([DEGREE_COLORS[1], DEGREE_COLORS[4], DEGREE_COLORS[5], "#ffffff"], 7), 200);
     // Hear it again with the names showing, so the sound and the function connect.
     const id = qid.current;
@@ -180,11 +208,11 @@ export function Progressions({ onBack }: { onBack: () => void }) {
     timer.current = window.setTimeout(next, 900 + x.chords.length * STEP * 1000 + 1200);
   };
 
-  const choose = (n: Numeral) => {
+  const choose = (c: ProgChord) => {
     if (phase !== "question" || !q) return;
     const need = q.chords.length - 1;
     if (picks.length >= need) return;
-    const nextPicks = [...picks, n];
+    const nextPicks = [...picks, c];
     setPicks(nextPicks);
     if (nextPicks.length === need) grade(q, nextPicks);
   };
@@ -192,16 +220,27 @@ export function Progressions({ onBack }: { onBack: () => void }) {
   /** Tap a slot to hear just that chord again. */
   const hearSlot = (i: number) => {
     if (!q || (phase !== "question" && phase !== "feedback")) return;
-    void playChord(diatonicTriad(q.tonic, q.chords[i]), STEP);
+    void playChord(progChordMidis(q.tonic, q.chords[i]), STEP);
   };
 
   function next() {
     if (timer.current) window.clearTimeout(timer.current);
-    if (roundRef.current >= ROUNDS) {
+    const tst = testRef.current;
+    const total = tst ? SKIP_TEST_ROUNDS : ROUNDS;
+    if (roundRef.current >= total) {
       qid.current++;
       setPlayingAt(null);
       setPhase("summary");
-      if (hitsRef.current >= ROUNDS * 0.8) {
+      if (tst) {
+        const passed = tst.hits >= SKIP_TEST_PASS;
+        setTestResult({ level: tst.level, hits: tst.hits, passed });
+        if (passed) {
+          setProgress((p) => passSkipTest(p, tst.level));
+          fireworks([DEGREE_COLORS[1], DEGREE_COLORS[4], DEGREE_COLORS[5], DEGREE_COLORS[6], "#ffffff"], 10);
+        }
+        testRef.current = null;
+        setTest(null);
+      } else if (hitsRef.current >= ROUNDS * 0.8) {
         fireworks(unlockedNotes(getState().progress).map((pc) => colorOf(settings.noteColors, pc)), 6);
       }
       return;
@@ -211,12 +250,15 @@ export function Progressions({ onBack }: { onBack: () => void }) {
 
   const spec = progSpec(progress);
   const acc = recentProgressionAccuracy(progress);
-  const done = spec.level >= PROG_LAST_LEVEL && progress.numeralsUnlocked >= NUMERALS.length;
+  const done = spec.level >= PROG_LAST_LEVEL;
   const active = phase === "playing" || phase === "question" || phase === "feedback";
   const need = q ? q.chords.length - 1 : spec.len - 1;
-  // Last level: the full grid with locks. Earlier levels: only the level's own choices.
-  const grid: Numeral[] = q && q.level < PROG_LAST_LEVEL ? q.choices : [...NUMERALS];
-  const unlockedSet = q && q.level < PROG_LAST_LEVEL ? q.choices : unlockedNumerals(progress);
+  const total = test ? SKIP_TEST_ROUNDS : ROUNDS;
+  // The unlock level shows all six triads with locks; every other level shows only its own choices.
+  const atNumeralLevel = q?.level === PROG_NUMERAL_LEVEL && !test;
+  const grid: ProgChord[] = q ? (atNumeralLevel ? [...NUMERALS] : q.choices) : [];
+  const unlockedSet: ProgChord[] = q ? (atNumeralLevel ? unlockedNumerals(progress) : q.choices) : [];
+  const nextLevel = spec.level + 1;
 
   return (
     <div className="flex min-h-[calc(100dvh-1rem)] flex-col">
@@ -226,7 +268,7 @@ export function Progressions({ onBack }: { onBack: () => void }) {
         sub={
           phase === "intro" || phase === "lesson"
             ? t.progressions.level(spec.level + 1, PROG_LEVELS.length)
-            : t.progressions.round(Math.min(Math.max(round, 1), ROUNDS), ROUNDS)
+            : `${test ? `${t.progressions.testing(test.level + 1)} · ` : ""}${t.progressions.round(Math.min(Math.max(round, 1), total), total)}`
         }
       />
       {wash && <ColorWash color={wash.color} k={wash.k} />}
@@ -238,18 +280,28 @@ export function Progressions({ onBack }: { onBack: () => void }) {
             <Card className="space-y-2">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-bold" data-testid="progressions-level">
-                  {t.progressions.level(spec.level + 1, PROG_LEVELS.length)}
+                  {test ? t.progressions.testing(test.level + 1) : t.progressions.level(spec.level + 1, PROG_LEVELS.length)}
                 </span>
-                <span className="text-xs text-ink-3">{t.progressions.levelDesc[spec.level]}</span>
+                <span className="text-right text-xs text-ink-3">{t.progressions.levelDesc[test ? test.level : spec.level]}</span>
               </div>
-              <div className="text-sm text-ink-2">
-                {acc.n
-                  ? t.progressions.accuracyRecent(acc.pct, acc.n)
-                  : spec.level < PROG_LAST_LEVEL
-                    ? t.progressions.levelNeed
-                    : t.progressions.unlockNeed}
-              </div>
-              {!done && <ProgressBar value={acc.n >= UNLOCK_WINDOW ? acc.pct / 100 / 0.9 : acc.n / UNLOCK_WINDOW} />}
+              {test ? (
+                <div className="text-sm text-ink-2" data-testid="progressions-test-score">
+                  {t.progressions.testScore(test.hits, SKIP_TEST_PASS)}
+                </div>
+              ) : (
+                !done && (
+                  <>
+                    <div className="text-sm text-ink-2">
+                      {acc.n
+                        ? t.progressions.accuracyRecent(acc.pct, acc.n)
+                        : spec.level === PROG_NUMERAL_LEVEL && progress.numeralsUnlocked < NUMERALS.length
+                          ? t.progressions.unlockNeed
+                          : t.progressions.levelNeed}
+                    </div>
+                    <ProgressBar value={acc.n >= UNLOCK_WINDOW ? acc.pct / 100 / 0.9 : acc.n / UNLOCK_WINDOW} />
+                  </>
+                )
+              )}
             </Card>
 
             <div className="flex min-h-44 flex-1 flex-col items-center justify-center gap-3 text-center">
@@ -257,12 +309,20 @@ export function Progressions({ onBack }: { onBack: () => void }) {
                 <>
                   <div className="text-6xl">🛤️</div>
                   <p className="text-ink-2">{t.exercises.progressions.desc}</p>
-                  <Button big onClick={ask} className="pulse-ring" data-testid="progressions-start">
+                  <Button big onClick={() => startSet()} className="pulse-ring" data-testid="progressions-start">
                     ▶ {t.start}
                   </Button>
-                  <Button variant="ghost" onClick={() => setPhase("lesson")} data-testid="progressions-lesson-open">
-                    📖 {t.progressions.lessonOpen}
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button variant="ghost" onClick={() => setPhase("lesson")} data-testid="progressions-lesson-open">
+                      📖 {t.progressions.lessonOpen}
+                    </Button>
+                    {!done && (
+                      <Button variant="secondary" onClick={() => startSet(nextLevel)} data-testid="progressions-skip">
+                        🚀 {t.progressions.skipTest(nextLevel + 1)}
+                      </Button>
+                    )}
+                  </div>
+                  {!done && <p className="text-xs text-ink-3">{t.progressions.skipHint(SKIP_TEST_PASS, SKIP_TEST_ROUNDS)}</p>}
                 </>
               )}
 
@@ -291,7 +351,9 @@ export function Progressions({ onBack }: { onBack: () => void }) {
                   />
                   {phase === "feedback" ? (
                     <button className="space-y-1" onClick={next} data-testid="progressions-feedback">
-                      <div className="text-sm text-ink-2">{t.progressions.inKey(nameOf(q.key))}</div>
+                      <div className="text-sm text-ink-2">
+                        {q.minor ? t.progressions.inMinorKey(nameOf(q.key)) : t.progressions.inKey(nameOf(q.key))}
+                      </div>
                       {verdict?.levelUp !== null && verdict?.levelUp !== undefined && (
                         <div className="text-sm font-bold text-accent">{t.progressions.levelDesc[verdict.levelUp]}</div>
                       )}
@@ -299,18 +361,13 @@ export function Progressions({ onBack }: { onBack: () => void }) {
                     </button>
                   ) : (
                     <>
-                      <p className="text-ink-2">{phase === "playing" ? t.progressions.playing : t.progressions.listenN(need)}</p>
+                      <p className="text-ink-2">{phase === "playing" ? t.progressions.playing : t.progressions.listenFrom(progLabel(q.chords[0]), need)}</p>
                       {phase === "question" && <p className="text-xs text-ink-3">{t.progressions.tapSlot}</p>}
                       <div className="flex flex-wrap justify-center gap-2">
                         <Button variant="secondary" disabled={phase !== "question"} onClick={() => void playQuestion(q)}>
                           ↻ {t.progressions.replay}
                         </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={phase !== "question"}
-                          onClick={() => setHinted(true)}
-                          data-testid="progressions-hint"
-                        >
+                        <Button variant="secondary" disabled={phase !== "question"} onClick={() => setHinted(true)} data-testid="progressions-hint">
                           💡 {t.progressions.hint}
                         </Button>
                         {need > 1 && (
@@ -325,21 +382,16 @@ export function Progressions({ onBack }: { onBack: () => void }) {
                         )}
                       </div>
                       {hinted && phase === "question" && (
-                        <Card className="w-full space-y-2" >
-                          <div className="text-sm font-bold">{t.progressions.hintTitle}</div>
+                        <Card className="w-full space-y-2">
+                          <div className="text-sm font-bold">{t.progressions.hintTitleFrom(progLabel(q.chords[0]))}</div>
                           <div className="flex flex-wrap justify-center gap-2" data-testid="progressions-hint-panel">
-                            {q.choices.map((n) => (
-                              <Button
-                                key={n}
-                                variant="secondary"
-                                data-hint-numeral={n}
-                                onClick={() => void playSeq(q.tonic, ["I", n])}
-                              >
-                                ▶ I → {n}
+                            {q.choices.map((c) => (
+                              <Button key={c} variant="secondary" data-hint-numeral={c} onClick={() => void playSeq(q.tonic, [q.chords[0], c])}>
+                                ▶ {progLabel(q.chords[0])} → {progLabel(c)}
                               </Button>
                             ))}
                           </div>
-                          <div className="text-xs text-ink-3">{t.progressions.hintNote}</div>
+                          <div className="text-xs text-ink-3">{test ? t.progressions.hintNoteTest : t.progressions.hintNote}</div>
                         </Card>
                       )}
                     </>
@@ -349,9 +401,23 @@ export function Progressions({ onBack }: { onBack: () => void }) {
 
               {phase === "summary" && (
                 <div className="w-full space-y-4">
-                  <div className="text-6xl">{hits >= ROUNDS * 0.8 ? "🏆" : "🎶"}</div>
-                  <h2 className="text-2xl font-black">{t.progressions.summaryLine(hits, ROUNDS)}</h2>
-                  <Button big className="w-full" onClick={onBack}>
+                  {testResult ? (
+                    <>
+                      <div className="text-6xl">{testResult.passed ? "🚀" : "💪"}</div>
+                      <h2 className="text-2xl font-black" data-testid="progressions-test-result">
+                        {testResult.passed
+                          ? t.progressions.testPass(testResult.level + 1)
+                          : t.progressions.testFail(testResult.hits, SKIP_TEST_PASS)}
+                      </h2>
+                      {testResult.passed && <p className="text-ink-2">{t.progressions.levelDesc[testResult.level]}</p>}
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-6xl">{hits >= ROUNDS * 0.8 ? "🏆" : "🎶"}</div>
+                      <h2 className="text-2xl font-black">{t.progressions.summaryLine(hits, ROUNDS)}</h2>
+                    </>
+                  )}
+                  <Button big className="w-full" onClick={() => setPhase("intro")} data-testid="progressions-summary-ok">
                     {t.done}
                   </Button>
                 </div>
@@ -359,18 +425,17 @@ export function Progressions({ onBack }: { onBack: () => void }) {
             </div>
 
             {active && q && (
-              <div
-                className={cx("grid gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]", grid.length === 2 ? "grid-cols-2" : "grid-cols-3")}
-              >
-                {grid.map((n) => {
-                  const on = unlockedSet.includes(n);
-                  const col = DEGREE_COLORS[NUMERAL_DEGREE[n]];
+              <div className={cx("grid gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]", grid.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
+                {grid.map((c) => {
+                  const on = unlockedSet.includes(c);
+                  const col = DEGREE_COLORS[PROG_CHORDS[c].deg];
+                  const label = progLabel(c);
                   return (
                     <button
-                      key={n}
-                      data-numeral={n}
+                      key={c}
+                      data-numeral={c}
                       disabled={!on || phase !== "question"}
-                      onClick={() => choose(n)}
+                      onClick={() => choose(c)}
                       className={cx(
                         "flex flex-col items-center justify-center rounded-3xl px-1 py-2 font-bold transition active:scale-95",
                         grid.length <= 3 ? "min-h-24" : "min-h-20",
@@ -383,8 +448,8 @@ export function Progressions({ onBack }: { onBack: () => void }) {
                           : { background: "var(--surface-2)", color: "var(--ink-3)" }
                       }
                     >
-                      <span className="font-serif text-3xl leading-none">{on ? n : "🔒"}</span>
-                      <span className="text-xs font-medium leading-tight opacity-80">{on ? t.progressions.feel[n] : ""}</span>
+                      <span className={cx("font-serif leading-none", label.length > 3 ? "text-2xl" : "text-3xl")}>{on ? label : "🔒"}</span>
+                      <span className="text-xs font-medium leading-tight opacity-80">{on ? t.progressions.feel[c] : ""}</span>
                     </button>
                   );
                 })}
@@ -406,7 +471,7 @@ function Lesson({ colors, onBegin }: { colors: NoteColors; onBegin: () => void }
   const step = steps[i];
   const last = i === steps.length - 1;
 
-  const play = async (seq: Numeral[]) => {
+  const play = async (seq: ProgChord[]) => {
     const id = ++playId.current;
     await playSeq(LESSON_TONIC, seq);
     for (let j = 0; j < seq.length; j++) {
@@ -423,17 +488,17 @@ function Lesson({ colors, onBegin }: { colors: NoteColors; onBegin: () => void }
     [],
   );
 
-  const seq = step.play as Numeral[];
-  const chip = (n: Numeral, j: number) => {
-    const col = colorOf(colors, rootOf(0, n));
+  const seq = step.play as ProgChord[];
+  const chip = (c: ProgChord, j: number) => {
+    const col = colorOf(colors, rootOf(0, c));
     return (
       <span
         key={j}
         className={cx("flex h-16 w-16 flex-col items-center justify-center rounded-2xl font-serif text-2xl font-black transition", lit === j && "scale-110")}
         style={{ background: col, color: inkOn(col), boxShadow: lit === j ? `0 0 24px 4px ${col}` : undefined }}
       >
-        {n}
-        <span className="font-sans text-[10px] font-bold">{chordName(0, n)}</span>
+        {progLabel(c)}
+        <span className="font-sans text-[10px] font-bold">{chordName(0, c)}</span>
       </span>
     );
   };
@@ -453,15 +518,15 @@ function Lesson({ colors, onBegin }: { colors: NoteColors; onBegin: () => void }
         {seq.length > 0 && (
           <>
             <div className="flex items-center justify-center gap-2">
-              {seq.map((n, j) => (
+              {seq.map((c, j) => (
                 <span key={j} className="flex items-center gap-2">
                   {j > 0 && <span className="text-ink-3">→</span>}
-                  {chip(n, j)}
+                  {chip(c, j)}
                 </span>
               ))}
             </div>
             <Button big className="w-full" onClick={() => void play(seq)} data-testid="lesson-play">
-              ▶ {seq.join(" → ")}
+              ▶ {seq.map(progLabel).join(" → ")}
             </Button>
           </>
         )}
@@ -475,11 +540,7 @@ function Lesson({ colors, onBegin }: { colors: NoteColors; onBegin: () => void }
             </Button>
           </div>
         )}
-        {i === 0 && (
-          <div className="flex justify-center gap-2">
-            {(["I", "IV", "V"] as Numeral[]).map((n, j) => chip(n, j + 10))}
-          </div>
-        )}
+        {i === 0 && <div className="flex justify-center gap-2">{(["I", "IV", "V"] as ProgChord[]).map((c, j) => chip(c, j + 10))}</div>}
       </Card>
       <div className="mt-auto grid grid-cols-2 gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <Button variant="secondary" disabled={i === 0} onClick={() => setI(i - 1)}>
@@ -499,7 +560,7 @@ function Lesson({ colors, onBegin }: { colors: NoteColors; onBegin: () => void }
   );
 }
 
-/** I, then the player's picks. After answering, each slot shows the real chord in its root's color. Tap to hear one chord. */
+/** The home chord, then the player's picks. After answering, each slot shows the real chord in its root's color. */
 function Slots({
   q,
   picks,
@@ -510,7 +571,7 @@ function Slots({
   onTap,
 }: {
   q: Q;
-  picks: Numeral[];
+  picks: ProgChord[];
   reveal: boolean;
   playingAt: number | null;
   colors: NoteColors;
@@ -523,10 +584,11 @@ function Slots({
       data-testid="progressions-slots"
     >
       {q.chords.map((real, i) => {
-        const pick = i === 0 ? "I" : picks[i - 1];
+        const pick = i === 0 ? q.chords[0] : picks[i - 1];
         const shown = i === 0 || reveal;
         const wrong = reveal && i > 0 && pick !== real;
         const col = colorOf(colors, rootOf(q.key, real));
+        const minorish = PROG_CHORDS[real].iv[1] === 3;
         return (
           <button
             key={i}
@@ -547,14 +609,16 @@ function Slots({
                 : { background: "var(--surface-2)", boxShadow: playingAt === i ? "0 0 18px 2px var(--ink-3)" : undefined }
             }
           >
-            <span className="font-serif text-2xl font-black leading-none">{shown ? real : (pick ?? "?")}</span>
+            <span className={cx("font-serif font-black leading-none", (shown ? progLabel(real) : (pick && progLabel(pick)) ?? "?").length > 3 ? "text-lg" : "text-2xl")}>
+              {shown ? progLabel(real) : pick ? progLabel(pick) : "?"}
+            </span>
             {shown ? (
               <>
                 <span className="text-xs font-bold">
-                  {moods[NUMERAL_QUALITY[real]]?.emoji} {chordName(q.key, real)}
+                  {(minorish ? moods.minor : moods.major)?.emoji} {chordName(q.key, real)}
                 </span>
-                {wrong && (
-                  <span className="rounded-full bg-black/35 px-2 text-[11px] font-bold text-white">{t.progressions.yourPick(pick)}</span>
+                {wrong && pick && (
+                  <span className="rounded-full bg-black/35 px-2 text-[11px] font-bold text-white">{t.progressions.yourPick(progLabel(pick))}</span>
                 )}
               </>
             ) : (
