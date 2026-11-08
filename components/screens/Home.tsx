@@ -216,6 +216,20 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
         </button>
         <div className="grid grid-cols-2 gap-3">
           <button
+            onClick={() => go("colorpick")}
+            data-testid="card-colorpick"
+            className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="h-8 w-8 rounded-full" style={{ background: noteCols[1], boxShadow: `0 0 14px ${noteCols[1]}` }} />
+              <span className="text-xl">→ 👂</span>
+            </span>
+            <span>
+              <span className="block font-bold">{t.exercises.colorpick.title}</span>
+              <span className="block text-xs text-ink-3">{t.exercises.colorpick.desc}</span>
+            </span>
+          </button>
+          <button
             onClick={() => go("mixchord")}
             data-testid="card-mixchord"
             className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"

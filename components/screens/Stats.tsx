@@ -381,6 +381,7 @@ export function Stats() {
           <Tile value={rainBest(p) || "–"} label={t.stats.rainBest} />
           <Tile value={pctOf(p.mixChords.filter(mixChordCorrect).length, p.mixChords.length)} label={t.stats.mixChordAcc} />
           <Tile value={matchBest(p, 6) || "–"} label={t.stats.matchBest} />
+          <Tile value={pctOf(p.colorPicks.filter((x) => x.answer === x.target).length, p.colorPicks.length)} label={t.stats.colorPickAcc} />
         </div>
       </Section>
 

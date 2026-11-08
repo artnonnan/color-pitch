@@ -21,6 +21,7 @@ import { Melody } from "./exercises/Melody";
 import { Rain } from "./exercises/Rain";
 import { MixChord } from "./exercises/MixChord";
 import { Match } from "./exercises/Match";
+import { ColorPick } from "./exercises/ColorPick";
 import { BurstLayer, clearBursts, fireworks } from "./fx/Burst";
 import { Aurora } from "./fx/Aurora";
 import { colorOf } from "@/lib/colors";
@@ -31,10 +32,10 @@ import { t } from "@/i18n";
 
 export type Screen =
   | "home" | "first" | "quiz" | "chords" | "modes" | "tuner" | "stats" | "settings" | "session"
-  | "rush" | "sing" | "roots" | "degrees" | "intervals" | "progressions" | "melody" | "rain" | "mixchord" | "match";
-const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match"];
+  | "rush" | "sing" | "roots" | "degrees" | "intervals" | "progressions" | "melody" | "rain" | "mixchord" | "match" | "colorpick";
+const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match", "colorpick"];
 // Screens that play notes: the daily first note should come before any of them.
-const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match"];
+const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match", "colorpick"];
 const NAV: { s: Screen; icon: string; label: string }[] = [
   { s: "home", icon: "🏠", label: t.nav.home },
   { s: "tuner", icon: "📻", label: t.nav.tuner },
@@ -146,6 +147,8 @@ function Shell() {
     body = <MixChord onBack={home} />;
   } else if (screen === "match") {
     body = <Match onBack={home} />;
+  } else if (screen === "colorpick") {
+    body = <ColorPick onBack={home} />;
   } else if (screen === "tuner") {
     body = <Tuner />;
   } else if (screen === "stats") {

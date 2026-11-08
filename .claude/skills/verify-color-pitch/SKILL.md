@@ -67,6 +67,7 @@ Existing recipes:
 | `recipes/modes.js` (clock +28 days to pass the week-4 lock) | [modes](features/modes.md) |
 | `recipes/audio-unlock.js` (`--profile none`) | [audio-unlock](features/audio-unlock.md) |
 | `recipes/progressions-advanced.js` (skip tests to level 7) | [progressions](features/progressions.md) |
+| `recipes/colorpick.js` | [colorpick](features/colorpick.md) |
 | `recipes/rain.js` | [rain](features/rain.md) |
 | `recipes/mixchord.js` | [mixchord](features/mixchord.md) |
 | `recipes/match.js` | [match](features/match.md) |

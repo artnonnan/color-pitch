@@ -165,6 +165,14 @@ export interface MixChordAnswer {
   /** Pitch classes the player tapped. */
   answer: PC[];
 }
+/** One "ทายจากสี" answer: see a color, pick the matching sound among `options`. */
+export interface ColorPickAnswer {
+  t: number;
+  target: PC;
+  answer: PC;
+  options: PC[];
+  ms: number;
+}
 /** One finished memory-match board. */
 export interface MatchGame {
   t: number;
@@ -203,6 +211,10 @@ export interface Progress {
   rain: RainRun[];
   mixChords: MixChordAnswer[];
   matchGames: MatchGame[];
+  colorPicks: ColorPickAnswer[];
+  /** Extra options above 2 in "ทายจากสี" (0 → 2 options … 2 → 4 options). */
+  colorPickLevel: number;
+  colorPickSince: number;
   degreesUnlocked: number; // count into DEGREE_UNLOCK_ORDER
   degreesSetSince: number;
   degrees: DegreeAnswer[];
@@ -284,6 +296,9 @@ export function defaultProgress(): Progress {
     rain: [],
     mixChords: [],
     matchGames: [],
+    colorPicks: [],
+    colorPickLevel: 0,
+    colorPickSince: 0,
     degreesUnlocked: INITIAL_DEGREES,
     degreesSetSince: 0,
     degrees: [],
@@ -345,6 +360,7 @@ export function normalizeState(raw: unknown): AppState {
       rain: arr(p.rain, []),
       mixChords: arr(p.mixChords, []),
       matchGames: arr(p.matchGames, []),
+      colorPicks: arr(p.colorPicks, []),
       degrees: arr(p.degrees, []),
       intervals: arr(p.intervals, []),
       progressions: arr(p.progressions, []),
@@ -606,6 +622,19 @@ export const rainBest = (p: Progress) => p.rain.reduce((m, r) => Math.max(m, r.s
 /** Fewest moves for a full board of `pairs` pairs (0 = never finished). */
 export const matchBest = (p: Progress, pairs: number) =>
   p.matchGames.filter((g) => g.pairs === pairs).reduce((m, g) => (m === 0 ? g.moves : Math.min(m, g.moves)), 0);
+export const COLOR_PICK_MAX_LEVEL = 2;
+export const colorPickOptions = (p: Progress) => 2 + Math.min(Math.max(p.colorPickLevel | 0, 0), COLOR_PICK_MAX_LEVEL);
+export const recentColorPickAccuracy = (p: Progress) =>
+  recent(p.colorPicks, p.colorPickSince, (a) => a.answer === a.target);
+/** Record a color-pick answer; returns the new option count if it grew. */
+export function recordColorPick(p: Progress, a: ColorPickAnswer): { progress: Progress; grewTo: number | null } {
+  let next: Progress = { ...p, colorPicks: capped(p.colorPicks, a) };
+  if (next.colorPickLevel < COLOR_PICK_MAX_LEVEL && meetsUnlock(recentColorPickAccuracy(next))) {
+    next = { ...next, colorPickLevel: next.colorPickLevel + 1, colorPickSince: a.t + 1 };
+    return { progress: next, grewTo: colorPickOptions(next) };
+  }
+  return { progress: next, grewTo: null };
+}
 export const mixChordCorrect = (a: MixChordAnswer) =>
   a.answer.length === a.target.length && a.target.every((pc) => a.answer.includes(pc));
 export const appendCapped = <T,>(arr: T[], item: T) => capped(arr, item);
