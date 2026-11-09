@@ -22,6 +22,11 @@ import { Rain } from "./exercises/Rain";
 import { MixChord } from "./exercises/MixChord";
 import { Match } from "./exercises/Match";
 import { ColorPick } from "./exercises/ColorPick";
+import { ApTest } from "./exercises/ApTest";
+import { Calm } from "./exercises/Calm";
+import { Memory } from "./exercises/Memory";
+import { Anchor } from "./exercises/Anchor";
+import { Wide } from "./exercises/Wide";
 import { BurstLayer, clearBursts, fireworks } from "./fx/Burst";
 import { Aurora } from "./fx/Aurora";
 import { colorOf } from "@/lib/colors";
@@ -32,10 +37,11 @@ import { t } from "@/i18n";
 
 export type Screen =
   | "home" | "first" | "quiz" | "chords" | "modes" | "tuner" | "stats" | "settings" | "session"
-  | "rush" | "sing" | "roots" | "degrees" | "intervals" | "progressions" | "melody" | "rain" | "mixchord" | "match" | "colorpick";
-const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match", "colorpick"];
+  | "rush" | "sing" | "roots" | "degrees" | "intervals" | "progressions" | "melody" | "rain" | "mixchord" | "match" | "colorpick"
+  | "aptest" | "calm" | "memory" | "anchor" | "wide";
+const SCREENS: Screen[] = ["home", "first", "quiz", "chords", "modes", "tuner", "stats", "settings", "session", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match", "colorpick", "aptest", "calm", "memory", "anchor", "wide"];
 // Screens that play notes: the daily first note should come before any of them.
-const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match", "colorpick"];
+const GATED: Screen[] = ["quiz", "chords", "modes", "rush", "sing", "roots", "degrees", "intervals", "progressions", "melody", "rain", "mixchord", "match", "colorpick", "aptest", "calm", "memory", "anchor", "wide"];
 const NAV: { s: Screen; icon: string; label: string }[] = [
   { s: "home", icon: "🏠", label: t.nav.home },
   { s: "tuner", icon: "📻", label: t.nav.tuner },
@@ -149,6 +155,16 @@ function Shell() {
     body = <Match onBack={home} />;
   } else if (screen === "colorpick") {
     body = <ColorPick onBack={home} />;
+  } else if (screen === "aptest") {
+    body = <ApTest onBack={home} />;
+  } else if (screen === "calm") {
+    body = <Calm onBack={home} />;
+  } else if (screen === "memory") {
+    body = <Memory onBack={home} />;
+  } else if (screen === "anchor") {
+    body = <Anchor onBack={home} />;
+  } else if (screen === "wide") {
+    body = <Wide onBack={home} />;
   } else if (screen === "tuner") {
     body = <Tuner />;
   } else if (screen === "stats") {

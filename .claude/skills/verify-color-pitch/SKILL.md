@@ -68,6 +68,7 @@ Existing recipes:
 | `recipes/audio-unlock.js` (`--profile none`) | [audio-unlock](features/audio-unlock.md) |
 | `recipes/progressions-advanced.js` (skip tests to level 7) | [progressions](features/progressions.md) |
 | `recipes/colorpick.js` | [colorpick](features/colorpick.md) |
+| `recipes/aptest.js`, `calm.js`, `memory.js`, `anchor.js`, `wide.js` | [pitch-memory](features/pitch-memory.md) |
 | `recipes/rain.js` | [rain](features/rain.md) |
 | `recipes/mixchord.js` | [mixchord](features/mixchord.md) |
 | `recipes/match.js` | [match](features/match.md) |

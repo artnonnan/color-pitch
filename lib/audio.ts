@@ -262,7 +262,12 @@ export function newVoice() {
   const others = VOICES.filter((v) => v !== mixVoice);
   mixVoice = others[Math.floor(Math.random() * others.length)];
 }
-const currentVoice = (): Voice => (instrument === "mix" ? mixVoice : instrument);
+let voiceOverride: Voice | null = null;
+/** Force a voice regardless of the instrument setting (null = back to the setting). */
+export function setVoiceOverride(v: Voice | null) {
+  voiceOverride = v;
+}
+const currentVoice = (): Voice => voiceOverride ?? (instrument === "mix" ? mixVoice : instrument);
 
 function synthFor(T: ToneModule, v: Exclude<Voice, "piano">): import("tone").PolySynth {
   if (v === "sine") {

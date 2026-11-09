@@ -174,6 +174,45 @@ export function Home({ go, startSession }: { go: (s: Screen) => void; startSessi
         <p className="text-xs text-ink-3">{t.home.curriculumNote}</p>
       </Card>
 
+      {/* pitch + color core drills */}
+      <div className="space-y-3">
+        <h2 className="px-1 font-bold">{t.home.pitchColor}</h2>
+        <button
+          onClick={() => go("aptest")}
+          data-testid="card-aptest"
+          className="flex min-h-24 w-full items-center gap-4 rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+        >
+          <span className="text-4xl">🎓</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-lg font-black">{t.exercises.aptest.title}</span>
+            <span className="block text-xs text-ink-3">{t.exercises.aptest.desc}</span>
+          </span>
+        </button>
+        <div className="grid grid-cols-2 gap-3">
+          {(
+            [
+              ["calm", "🌈"],
+              ["memory", "🧠"],
+              ["anchor", "⚓"],
+              ["wide", "🎚️"],
+            ] as const
+          ).map(([s, icon]) => (
+            <button
+              key={s}
+              onClick={() => go(s)}
+              data-testid={`card-${s}`}
+              className="flex min-h-28 flex-col justify-between rounded-3xl border border-line bg-surface p-4 text-left active:scale-[0.98]"
+            >
+              <span className="text-2xl">{icon}</span>
+              <span>
+                <span className="block font-bold">{t.exercises[s].title}</span>
+                <span className="block text-xs text-ink-3">{t.exercises[s].desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* more */}
       <div className="space-y-3">
         <h2 className="px-1 font-bold">{t.home.moreExercises}</h2>

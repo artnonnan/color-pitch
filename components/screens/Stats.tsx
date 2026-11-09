@@ -382,6 +382,17 @@ export function Stats() {
           <Tile value={pctOf(p.mixChords.filter(mixChordCorrect).length, p.mixChords.length)} label={t.stats.mixChordAcc} />
           <Tile value={matchBest(p, 6) || "–"} label={t.stats.matchBest} />
           <Tile value={pctOf(p.colorPicks.filter((x) => x.answer === x.target).length, p.colorPicks.length)} label={t.stats.colorPickAcc} />
+          <Tile
+            value={(() => {
+              const x = p.apTests.at(-1);
+              return x ? `${Math.round((x.items.filter((i) => i.answer === i.target).length / x.items.length) * 100)}%` : "–";
+            })()}
+            label={t.stats.apTestLast}
+          />
+          <Tile value={Math.round(p.calmSessions.reduce((a, x) => a + x.secs, 0) / 60) || "–"} label={t.stats.calmMinutes} />
+          <Tile value={pctOf(p.memAnswers.filter((x) => x.answer === x.target).length, p.memAnswers.length)} label={t.stats.memAcc} />
+          <Tile value={pctOf(p.anchorAnswers.filter((x) => x.said === (x.played === x.anchor)).length, p.anchorAnswers.length)} label={t.stats.anchorAcc} />
+          <Tile value={pctOf(p.wideAnswers.filter((x) => x.answer === x.target).length, p.wideAnswers.length)} label={t.stats.wideAcc} />
         </div>
       </Section>
 

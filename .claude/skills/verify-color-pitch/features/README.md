@@ -39,6 +39,7 @@ Each feature file starts with an H1 title and one paragraph that describes what 
 - [Melody](./melody.md) covers melodic dictation with absolute pitch: hearing a melody of unlocked notes and tapping it back, with melodies growing from 3 to 6 notes.
 - [Audio unlock and sound diagnostics](./audio-unlock.md) covers the first-tap unlock (from the profile picker), the silent media-channel loop, the session fallback, and the Settings diagnostics card.
 - [Mode brightness](./modes.md) covers the week-4 lock, an intro lesson, and four levels from bright/dark up to the seven-mode slider, with the differing notes highlighted.
+- [Pitch and color core drills](./pitch-memory.md) covers the no-feedback weekly test with certificate, Color Calm passive listening, pitch memory with a distractor hold, the anchor note yes/no drill, and the C1–C7 all-octaves quiz.
 - [Color → sound](./colorpick.md) covers seeing only a color, hearing 2–4 notes in random octaves, and picking the one of that color, with options growing by accuracy.
 - [Color Rain](./rain.md) covers an arcade game: falling note drops that you catch by key, with lives, speed ramp, pause and gray (ear-only) mode.
 - [Chord color mix](./mixchord.md) covers hearing a chord, tapping all its notes, and comparing your color blend with the chord's.

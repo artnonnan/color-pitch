@@ -58,6 +58,11 @@ Daily session (~10–15 min), started with one button:
 | 14 | **Chord Color Mix** | Hear a 3-note chord, tap every note in it, and check. Your picked colors blend into "your mix" next to the chord's real blend, with the chord name. Roots come from unlocked notes and qualities from unlocked chords. "Play one at a time" helps. |
 | 15 | **Sound Match** | A memory game. Turn face-down cards to hear notes and match two cards of the same note. They are in different octaves, so you match pitch class, not height. 3- or 6-pair boards, colors shown only after a match (or on flip in easy mode), fewest moves wins. |
 | 16 | **Color → Sound** | The reverse of the quiz, without singing. See only a color, hear 2–4 notes (each in a random octave, so height gives nothing away), and pick the one that is that color. Tap cards to hear them again. Options grow from 2 to 4 by the 90 %/30 rule. |
+| 17 | **Pitch Test** | A weekly 24-item test with no feedback. A noise burst before each item, random voice and octave. The result has per-note accuracy, top confusions, a certificate for notes right every time, and history. |
+| 18 | **Color Calm** | Passive: a slow note every 4.5 s with the whole screen in its color, for 5, 10 or 15 minutes. The time counts as practice. |
+| 19 | **Pitch Memory** | Hear a note, hold it through 5–30 s of random notes, then name it. The hold grows by accuracy. |
+| 20 | **Anchor Note** | Pick one note and answer yes/no in any octave or voice. Decoys move closer as you improve. |
+| 21 | **All Octaves** | The quiz from C1 to C7 with a new voice every question, with accuracy split by register. |
 | 5 | **Pocket tuner** | Hear a sound in daily life: tap your guess, then measure. Shows the real note and its color, and logs your accuracy. |
 
 **Visual feedback:** particle bursts in the note's color on correct answers, a combo counter (its color is fixed so it never gives away the answer), a full-screen ceremony when a note unlocks, a slowly drifting aurora in your unlocked colors, and fireworks for new high scores and finished sessions. All of it respects "reduce motion".

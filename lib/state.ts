@@ -173,6 +173,37 @@ export interface ColorPickAnswer {
   options: PC[];
   ms: number;
 }
+/** One weekly pitch test (no feedback during the test). */
+export interface ApTest {
+  t: number;
+  items: { target: PC; answer: PC; midi: number; ms: number }[];
+}
+export interface CalmSession {
+  t: number;
+  secs: number;
+}
+/** Pitch memory: name a note heard `delay` seconds ago, with distracting notes between. */
+export interface MemoryAnswer {
+  t: number;
+  target: PC;
+  answer: PC;
+  delay: number;
+}
+/** Anchor note: was this note the anchor? `said` = the player's yes/no. */
+export interface AnchorAnswer {
+  t: number;
+  anchor: PC;
+  played: PC;
+  said: boolean;
+}
+/** Wide-range quiz: any octave C1–C7, random voice. */
+export interface WideAnswer {
+  t: number;
+  target: PC;
+  answer: PC;
+  midi: number;
+  voice: string;
+}
 /** One finished memory-match board. */
 export interface MatchGame {
   t: number;
@@ -215,6 +246,17 @@ export interface Progress {
   /** Extra options above 2 in "ทายจากสี" (0 → 2 options … 2 → 4 options). */
   colorPickLevel: number;
   colorPickSince: number;
+  apTests: ApTest[];
+  calmSessions: CalmSession[];
+  memAnswers: MemoryAnswer[];
+  memLevel: number; // index into MEM_DELAYS
+  memSince: number;
+  anchorAnswers: AnchorAnswer[];
+  /** The player's anchor note; null = not chosen yet. */
+  anchorPc: PC | null;
+  anchorLevel: number; // index into ANCHOR_MIN_DISTANCE
+  anchorSince: number;
+  wideAnswers: WideAnswer[];
   degreesUnlocked: number; // count into DEGREE_UNLOCK_ORDER
   degreesSetSince: number;
   degrees: DegreeAnswer[];
@@ -299,6 +341,16 @@ export function defaultProgress(): Progress {
     colorPicks: [],
     colorPickLevel: 0,
     colorPickSince: 0,
+    apTests: [],
+    calmSessions: [],
+    memAnswers: [],
+    memLevel: 0,
+    memSince: 0,
+    anchorAnswers: [],
+    anchorPc: null,
+    anchorLevel: 0,
+    anchorSince: 0,
+    wideAnswers: [],
     degreesUnlocked: INITIAL_DEGREES,
     degreesSetSince: 0,
     degrees: [],
@@ -361,6 +413,11 @@ export function normalizeState(raw: unknown): AppState {
       mixChords: arr(p.mixChords, []),
       matchGames: arr(p.matchGames, []),
       colorPicks: arr(p.colorPicks, []),
+      apTests: arr(p.apTests, []),
+      calmSessions: arr(p.calmSessions, []),
+      memAnswers: arr(p.memAnswers, []),
+      anchorAnswers: arr(p.anchorAnswers, []),
+      wideAnswers: arr(p.wideAnswers, []),
       degrees: arr(p.degrees, []),
       intervals: arr(p.intervals, []),
       progressions: arr(p.progressions, []),
@@ -635,6 +692,35 @@ export function recordColorPick(p: Progress, a: ColorPickAnswer): { progress: Pr
   }
   return { progress: next, grewTo: null };
 }
+// ---------- pitch memory, anchor note ----------
+/** Seconds between hearing the note and answering, per level. */
+export const MEM_DELAYS = [5, 10, 20, 30];
+export const memDelay = (p: Progress) => MEM_DELAYS[Math.min(Math.max(p.memLevel | 0, 0), MEM_DELAYS.length - 1)];
+export const recentMemAccuracy = (p: Progress) => recent(p.memAnswers, p.memSince, (a) => a.answer === a.target);
+export function recordMemory(p: Progress, a: MemoryAnswer): { progress: Progress; grewTo: number | null } {
+  let next: Progress = { ...p, memAnswers: capped(p.memAnswers, a) };
+  if (next.memLevel < MEM_DELAYS.length - 1 && meetsUnlock(recentMemAccuracy(next))) {
+    next = { ...next, memLevel: next.memLevel + 1, memSince: a.t + 1 };
+    return { progress: next, grewTo: memDelay(next) };
+  }
+  return { progress: next, grewTo: null };
+}
+/** Closest a decoy may be to the anchor, in semitones, per level (1 = its neighbors). */
+export const ANCHOR_MIN_DISTANCE = [3, 2, 1];
+export const anchorDistance = (p: Progress) =>
+  ANCHOR_MIN_DISTANCE[Math.min(Math.max(p.anchorLevel | 0, 0), ANCHOR_MIN_DISTANCE.length - 1)];
+export const anchorCorrect = (a: AnchorAnswer) => a.said === (a.played === a.anchor);
+export const recentAnchorAccuracy = (p: Progress) => recent(p.anchorAnswers, p.anchorSince, anchorCorrect);
+export function recordAnchor(p: Progress, a: AnchorAnswer): { progress: Progress; grewTo: number | null } {
+  let next: Progress = { ...p, anchorAnswers: capped(p.anchorAnswers, a) };
+  if (next.anchorLevel < ANCHOR_MIN_DISTANCE.length - 1 && meetsUnlock(recentAnchorAccuracy(next))) {
+    next = { ...next, anchorLevel: next.anchorLevel + 1, anchorSince: a.t + 1 };
+    return { progress: next, grewTo: next.anchorLevel };
+  }
+  return { progress: next, grewTo: null };
+}
+/** Register of a MIDI note for wide-range stats. */
+export const registerOf = (midi: number): "low" | "mid" | "high" => (midi < 48 ? "low" : midi < 72 ? "mid" : "high");
 export const mixChordCorrect = (a: MixChordAnswer) =>
   a.answer.length === a.target.length && a.target.every((pc) => a.answer.includes(pc));
 export const appendCapped = <T,>(arr: T[], item: T) => capped(arr, item);
